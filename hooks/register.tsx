@@ -1231,10 +1231,8 @@ export const register: Register = on => {
           <Box flexGrow={1} flexShrink={1}>
             <Text wrap="truncate">
               <Text bold color={C.ink} backgroundColor={C.queue}>
-                {' ◈ GLANCE  DECK '}
+                {' ◈  GLANCE  DECK '}
               </Text>
-              <Text color={C.faint}>{'  · '}</Text>
-              <Text color={C.queue}>{basename(cwd)}</Text>
             </Text>
           </Box>
           <Box flexShrink={0}>
