@@ -118,6 +118,7 @@ declare module 'claude-code' {
       queue: QueueFile
       runtime: Runtime
       others: Heartbeat[]
+      self: Heartbeat | null
     }
   }
 }

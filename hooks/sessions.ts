@@ -59,16 +59,19 @@ export const rowsOf = (
   return beats
     .filter(h => h.sessionId !== selfId && isLive(h, now))
     .sort((a, b) => rank[a.status] - rank[b.status] || b.since - a.since)
-    .map(h => ({
-      sessionId: h.sessionId,
-      queueKey: h.queueKey,
-      status: h.status === 'idle' ? 'done' : h.status,
-      project: h.project,
-      account: h.account,
-      activity: h.status === 'idle' ? 'rảnh' : shorten(h.activity || (h.status === 'waiting' ? 'chờ bạn' : 'đang làm'), 40),
-      elapsed: fmtUntil(now - h.since),
-    }))
+    .map(h => rowOf(h, now))
 }
+
+/** One heartbeat as a SESSIONS row. */
+export const rowOf = (h: Heartbeat, now: number): SessionRow & { sessionId: string; queueKey: string } => ({
+  sessionId: h.sessionId,
+  queueKey: h.queueKey,
+  status: h.status === 'idle' ? 'done' : h.status,
+  project: h.project,
+  account: h.account,
+  activity: h.status === 'idle' ? 'rảnh' : shorten(h.activity || (h.status === 'waiting' ? 'chờ bạn' : 'đang làm'), 40),
+  elapsed: fmtUntil(now - h.since),
+})
 
 /**
  * Which live session sends this project's queue: the one that started first. Two sessions on one

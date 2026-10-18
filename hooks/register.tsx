@@ -34,7 +34,7 @@ import {
   projectKey,
   shouldStart,
 } from './queue'
-import { accountOf, dueAlerts, isQueueOwner, mergeLogs, parseHeartbeat, peerAgents, questionOf, rowsOf, sharedAgents } from './sessions'
+import { accountOf, dueAlerts, isQueueOwner, mergeLogs, parseHeartbeat, peerAgents, questionOf, rowOf, rowsOf, sharedAgents } from './sessions'
 
 const PANE = 'glancedeck'
 const PANE_COLUMNS = 58
@@ -74,6 +74,7 @@ const log = atom({ plugin: 'glancedeck', key: 'log' } as const, [] as LogLine[])
 const queue = atom({ plugin: 'glancedeck', key: 'queue' } as const, EMPTY_QUEUE)
 const runtime = atom({ plugin: 'glancedeck', key: 'runtime' } as const, IDLE)
 const others = atom({ plugin: 'glancedeck', key: 'others' } as const, [] as Heartbeat[])
+const self = atom({ plugin: 'glancedeck', key: 'self' } as const, null as Heartbeat | null)
 
 const BLOCK_OF_KEY: Record<string, Block> = { q: 'queue', s: 'sessions', a: 'agents', l: 'log' }
 
@@ -220,6 +221,7 @@ async function tick($: EngineInterface, isGone = false) {
     if (h) beats.push(h)
   }
   await update($, others, () => beats.filter(h => h.sessionId !== id))
+  await update($, self, () => beat)
 
   // Two sessions on one repo share its queue: only the one that started first sends it.
   const isOwner = isQueueOwner(beats, beat, now)
@@ -653,13 +655,14 @@ export const register: Register = on => {
     const { Box, Text, Button } = els
     const Input = 'Input' in els ? els.Input : null
     const hasClient = 'Client' in els
-    const [v0, cards0, lines0, q0, rt0, beats0, selfId, cwd, now] = await Promise.all([
+    const [v0, cards0, lines0, q0, rt0, beats0, selfBeat, selfId, cwd, now] = await Promise.all([
       read($, view),
       read($, agents),
       read($, log),
       read($, queue),
       read($, runtime),
       read($, others),
+      read($, self),
       $.session.id().catch(() => ''),
       $.session.cwd().catch(() => '?'),
       $.clock.now(),
@@ -937,6 +940,19 @@ export const register: Register = on => {
                 <Text color={C.faint}>không nhập được trên thiết bị này</Text>
               )}
             </Box>,
+          ]
+        : []),
+      ...(isOpen('sessions') && !picking && selfBeat
+        ? [
+            ((s: SessionRow) =>
+              row(
+                's-self',
+                <Text wrap="truncate" color={C.dim}>
+                  {` ${MARK[s.status].icon}  ${s.project} (đây)`}
+                  {s.account ? ` @${s.account}` : ''}
+                </Text>,
+                <Text color={C.faint}>{s.elapsed ? `${s.activity} · ${s.elapsed}` : s.activity}</Text>,
+              ))(rowOf(selfBeat, now)),
           ]
         : []),
       ...(isOpen('sessions') && !picking
