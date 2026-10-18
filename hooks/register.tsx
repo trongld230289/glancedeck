@@ -699,7 +699,8 @@ export const register: Register = on => {
     const q = normalizeQueue(q0)
     const rt = { ...IDLE, ...rt0 }
     const t = { ...NO_TURN, ...turn0 }
-    const W = Math.max(40, e.props.bodyColumns)
+    // One column of air on each side of the pane.
+    const W = Math.max(40, e.props.bodyColumns - 2)
     const inner = W - 4
     const isOpen = (b: Block) => !v.collapsed.includes(b)
     const fold = (b: Block) => () => setView($, x => ({ ...x, collapsed: toggle(x.collapsed, b) }))
@@ -1131,9 +1132,19 @@ export const register: Register = on => {
       ) : isTurnLive ? (
         row(
           't-now',
-          <Text color={C.text}>đang làm</Text>,
           hasClient ? (
-            <els.Client key="t-spin" module="./spin.tsx" props={{ color: C.ember, since: t.startedAt, now }} />
+            <els.Client key="t-spin-label" module="./spin.tsx" props={{ color: C.ember, label: 'đang làm', bold: true, now }} />
+          ) : (
+            <Text color={C.ember} bold>
+              ● đang làm
+            </Text>
+          ),
+          hasClient ? (
+            <els.Client
+              key="t-spin"
+              module="./spin.tsx"
+              props={{ color: C.ember, track: C.faint, bar: 14, bold: true, since: t.startedAt, now }}
+            />
           ) : (
             <Text color={C.ember}>{`● ${fmtElapsed(now - t.startedAt)}`}</Text>
           ),
@@ -1215,14 +1226,14 @@ export const register: Register = on => {
     )
 
     return (
-      <Box flexDirection="column" width={W}>
+      <Box flexDirection="column" width={W + 2} paddingX={1}>
         <Box width={W} marginBottom={1}>
           <Box flexGrow={1} flexShrink={1}>
             <Text wrap="truncate">
-              <Text bold color={C.text}>
-                GLANCEDECK
+              <Text bold color={C.ink} backgroundColor={C.queue}>
+                {' ◈ GLANCE  DECK '}
               </Text>
-              <Text color={C.faint}>{' · '}</Text>
+              <Text color={C.faint}>{'  · '}</Text>
               <Text color={C.queue}>{basename(cwd)}</Text>
             </Text>
           </Box>
