@@ -988,7 +988,8 @@ export const register: Register = on => {
                   {` ${MARK[s.status].icon}  ${s.project}`}
                   {s.account ? ` @${s.account}` : ''}
                 </Text>,
-                <Text color={C.faint}>{s.elapsed ? `${s.activity} · ${s.elapsed}` : s.activity}</Text>,
+                // What this session is doing is the TURN block's to say; here it only marks which row is you.
+                <Text color={C.faint}>this session</Text>,
               ))(rowOf(selfBeat, now)),
           ]
         : []),
@@ -1240,10 +1241,10 @@ export const register: Register = on => {
         <Box width={W} marginBottom={1}>
           <Box flexGrow={1} flexShrink={1}>
             <Text wrap="truncate">
-              <Text bold color={C.ink} backgroundColor={C.queue}>
-                {/* ◈ came from a fallback font and spilled over the next cell; ● is drawn by the terminal font itself (same as the chips). */}
-                {' ● GLANCE  DECK '}
-              </Text>
+              {/* A wordmark, not a slab: ● is drawn by the terminal font itself (◈ came from a fallback font and spilled over the next cell). */}
+              <Text color={C.queue}>{'● '}</Text>
+              <Text bold color={C.text}>glance</Text>
+              <Text bold color={C.queue}>deck</Text>
             </Text>
           </Box>
           <Box flexShrink={0}>

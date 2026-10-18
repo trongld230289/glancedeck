@@ -19,7 +19,7 @@ test('the pane draws the four blocks at 58 columns', async ($, on) => {
   const ui = await $.ui.mount({ plugin: 'glancedeck', surface: 'terminal', ...PANE })
 
   expect(await ui.find({ text: /glanceline/ })).toBeUndefined()
-  expect(await ui.find({ text: /GLANCE  DECK/ })).toBeDefined()
+  expect(await ui.find({ text: /● glancedeck/ })).toBeDefined()
   for (const title of ['QUEUE', 'SESSIONS', 'AGENTS', 'SESSION LOG']) {
     expect(await ui.find({ text: title })).toBeDefined()
   }
