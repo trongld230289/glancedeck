@@ -994,10 +994,24 @@ export const register: Register = on => {
             ((s: SessionRow) =>
               row(
                 's-self',
-                <Text wrap="truncate" color={C.dim}>
-                  {` ${MARK[s.status].icon}  ${s.project}`}
-                  {s.account ? ` @${s.account}` : ''}
-                </Text>,
+                s.status === 'working' && hasClient ? (
+                  <Box>
+                    <Box flexShrink={0}>
+                      <Text> </Text>
+                      <els.Client key="s-self-spin" module="./spin.tsx" props={{ color: C.ember, now }} />
+                      <Text>  </Text>
+                    </Box>
+                    <Text wrap="truncate" color={C.dim}>
+                      {s.project}
+                      {s.account ? ` @${s.account}` : ''}
+                    </Text>
+                  </Box>
+                ) : (
+                  <Text wrap="truncate" color={C.dim}>
+                    {` ${MARK[s.status].icon}  ${s.project}`}
+                    {s.account ? ` @${s.account}` : ''}
+                  </Text>
+                ),
                 // What this session is doing is the TURN block's to say; here it only marks which row is you.
                 <Text color={C.faint}>this session</Text>,
               ))(rowOf(selfBeat, now)),
@@ -1164,7 +1178,7 @@ export const register: Register = on => {
             <els.Client
               key="t-spin"
               module="./spin.tsx"
-              props={{ color: C.ember, track: C.faint, bar: 14, bold: true, since: t.startedAt, now }}
+              props={{ color: C.ember, clockOnly: true, bold: true, since: t.startedAt, now }}
             />
           ) : (
             <Text color={C.ember}>{`● ${fmtElapsed(now - t.startedAt)}`}</Text>
