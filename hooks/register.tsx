@@ -849,7 +849,7 @@ export const register: Register = on => {
           <Text color={autoColor}>{autoText}</Text>
         </Text>,
         usageHold?.resetsAt ? (
-          <Text color={C.sessions}>{`↻ resumes in ${fmtUntil(usageHold.resetsAt - now)}`}</Text>
+          <Text color={C.sessions}>{`○ resumes in ${fmtUntil(usageHold.resetsAt - now)}`}</Text>
         ) : (
           <Text color={C.faint}>{`pauses if 5h>${USAGE_LIMIT}%`}</Text>
         ),

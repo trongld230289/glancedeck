@@ -1,6 +1,6 @@
 {
   "name": "glancedeck",
-  "version": "0.2.10",
+  "version": "0.2.11",
   "description": "A pane beside the transcript: prompt queue, other sessions across accounts, subagents and the session log",
   "author": { "name": "trongld230289" },
   "types": "./types/index.d.ts"
