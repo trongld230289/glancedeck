@@ -1244,13 +1244,13 @@ export const register: Register = on => {
           </Box>
         </Box>
         <Box width={W}>
-          {chip(C.queue, `${q.items.length} chờ gửi`, q.items.length > 0)}
           {chip(C.sessions, `${waiting} chờ bạn`, waiting > 0)}
+          {chip(C.queue, `${q.items.length} chờ gửi`, q.items.length > 0)}
           {chip(C.agents, `${running} agent`, running > 0)}
           {chip(C.log, 'log', false)}
         </Box>
-        {queueBlock}
         {sessionsBlock}
+        {queueBlock}
         {turnBlock}
         {agentsBlock}
         {logBlock}
