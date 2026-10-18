@@ -1237,7 +1237,8 @@ export const register: Register = on => {
           <Box flexGrow={1} flexShrink={1}>
             <Text wrap="truncate">
               <Text bold color={C.ink} backgroundColor={C.queue}>
-                {' ◈  GLANCE  DECK '}
+                {/* ◈ came from a fallback font and spilled over the next cell; ● is drawn by the terminal font itself (same as the chips). */}
+                {' ● GLANCE  DECK '}
               </Text>
             </Text>
           </Box>
