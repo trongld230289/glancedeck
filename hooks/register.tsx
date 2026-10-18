@@ -370,6 +370,11 @@ async function pause($: EngineInterface) {
   await changeQueue($, q => ({ ...q, paused: true, pauseReason: 'user' }))
 }
 
+/** Puts the focus ring on a text field that just appeared: autoFocus only acts when the pane first takes the keys. */
+async function focusInput($: EngineInterface, key: string) {
+  await quietly($, 'focus', () => $.ui.focus({ requestId: PANE, key }))
+}
+
 async function sendNow($: EngineInterface) {
   const q = normalizeQueue(await read($, queue))
   const head = q.items[0]
@@ -857,7 +862,11 @@ export const register: Register = on => {
                     <Text color={C.faint}> </Text>
                     {act('q-k-down', 'j', 'xuống', () => selected && changeQueue($, x => move(x, selected, 1)))}
                     <Text color={C.faint}> </Text>
-                    {act('q-k-edit', 'e', 'sửa', () => selected && setView($, x => ({ ...x, editing: selected })))}
+                    {act('q-k-edit', 'e', 'sửa', async () => {
+                      if (!selected) return
+                      await setView($, x => ({ ...x, editing: selected }))
+                      await focusInput($, `q-edit-${selected}`)
+                    })}
                     <Text color={C.faint}> </Text>
                     {act(
                       'q-k-del',
@@ -899,6 +908,7 @@ export const register: Register = on => {
         await setView($, x => ({ ...x, picking: null }))
       } else {
         await setView($, x => ({ ...x, picking: null, messageTo: s.sessionId }))
+        await focusInput($, 's-msg-input')
       }
     }
     const messageTarget = v.messageTo ? sessions.find(s => s.sessionId === v.messageTo) : undefined
@@ -1237,7 +1247,10 @@ export const register: Register = on => {
         )}
         <Box width={W}>
           <Text color={C.faint}>↑↓ di chuyển · </Text>
-          <Button key="f-queue" plain hotkey="q" onPress={() => setView($, x => ({ ...x, editing: 'new', focusBlock: 'queue' }))}>
+          <Button key="f-queue" plain hotkey="q" onPress={async () => {
+              await setView($, x => ({ ...x, editing: 'new', focusBlock: 'queue' }))
+              await focusInput($, 'q-new')
+            }}>
             thêm queue
           </Button>
           <Text color={C.faint}> · </Text>
