@@ -1069,6 +1069,16 @@ export const register: Register = on => {
       ) : (
         <Text color={C.ember}>{`● ${fmtElapsed(now - c.spawnedAt)}`}</Text>
       )
+    // The model sits on the right, just before the clock, so names keep the left column.
+    const withModel = (model: string | undefined, right: JSX.Element) =>
+      model ? (
+        <Box>
+          <Text color={C.faint}>{`${prettyModel(model)} `}</Text>
+          {right}
+        </Box>
+      ) : (
+        right
+      )
     const agentsBlock = frame('agents', C.agents, running > 0, [
       headRow(
         'agents',
@@ -1091,10 +1101,9 @@ export const register: Register = on => {
                 >
                   <Text wrap="truncate">
                     <Text color={c.status === 'running' ? C.text : C.dim}>{c.name}</Text>
-                    {c.model ? <Text color={C.faint}>{` · ${prettyModel(c.model)}`}</Text> : null}
                   </Text>
                 </Button>,
-                clock(c),
+                withModel(c.model, clock(c)),
               ),
               ...(v.expandedAgent === i && expanded
                 ? [
@@ -1118,12 +1127,11 @@ export const register: Register = on => {
               <Text wrap="truncate">
                 <Text color={C.agents}>◇ </Text>
                 <Text color={a.status === 'running' ? C.text : C.dim}>{a.name}</Text>
-                {a.model ? <Text color={C.faint}>{` · ${prettyModel(a.model)}`}</Text> : null}
                 <Text color={C.faint}>{`  ${kTokens(a.ctx + a.out)} token · `}</Text>
                 <Text color={C.dim}>{a.project}</Text>
                 {a.account ? <Text color={C.rose}>{` @${a.account}`}</Text> : null}
               </Text>,
-              a.status === 'running' ? (
+              withModel(a.model, a.status === 'running' ? (
                 hasClient ? (
                   <els.Client key={`a-peer-clock-${k}`} module="./spin.tsx" props={{ since: a.spawnedAt, now, color: C.ember }} />
                 ) : (
@@ -1133,7 +1141,7 @@ export const register: Register = on => {
                 <Text color={a.status === 'done' ? C.jade : C.alarm}>
                   {`${a.status === 'done' ? '✓' : '✗'} ${fmtElapsed((a.endedAt ?? now) - a.spawnedAt)}`}
                 </Text>
-              ),
+              )),
             ),
           )
         : []),
