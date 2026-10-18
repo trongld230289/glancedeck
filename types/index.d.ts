@@ -87,6 +87,18 @@ export type Runtime = {
   question: string | null
 }
 
+/** This session's main turn: the running one, or the last one once it ended. */
+export type Turn = {
+  startedAt: number | null
+  endedAt: number | null
+  model: string
+  edits: number
+  errors: number
+  agents: number
+  /** Why the last turn ended (`answer` when it finished normally); null while it runs. */
+  reason: string | null
+}
+
 /** What each session writes to the shared folder every few seconds. */
 export type Heartbeat = {
   sessionId: string
@@ -119,6 +131,7 @@ declare module 'claude-code' {
       runtime: Runtime
       others: Heartbeat[]
       self: Heartbeat | null
+      turn: Turn
     }
   }
 }

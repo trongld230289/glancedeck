@@ -103,3 +103,30 @@ test('c folds the block that holds the focus; the all tab shows other sessions',
   expect(await ui.find({ text: '[all]' })).toBeDefined()
   await ui.unmount()
 })
+
+test('the TURN block runs while the main turn does, then becomes a receipt', async ($, on) => {
+  const clock = mock.clock(on, { now: Date.UTC(2026, 9, 18, 10, 0, 0) })
+  on('turn.start', () => ({ turnId: 't1' }))
+  on('turn.complete', () => ({ text: '' }))
+  on('tool.call', (_, e) => (e.tool === 'Bash' ? { isError: true, result: 'exit 1', text: 'exit 1' } : { result: { ok: true } as never }))
+
+  let ui = await $.ui.mount({ plugin: 'glancedeck', surface: 'terminal', ...PANE })
+  expect(await ui.find({ text: 'chưa có lượt nào' })).toBeDefined()
+  await ui.unmount()
+
+  await $.turn.start({ text: 'sửa lỗi', turnId: 't1' } as never)
+  await $.tool.call({ tool: 'Edit', tool_use_id: 'e1', file_path: 'D:/x/a.ts', old_string: 'a', new_string: 'b' } as never)
+  await $.tool.call({ tool: 'Bash', tool_use_id: 'b1', command: 'npm test' } as never)
+  ui = await $.ui.mount({ plugin: 'glancedeck', surface: 'terminal', ...PANE })
+  expect(await ui.find({ text: 'TURN' })).toBeDefined()
+  expect(await ui.find({ text: '1 sửa' })).toBeDefined()
+  expect(await ui.find({ text: '1 lỗi' })).toBeDefined()
+  expect(await ui.find({ text: /lượt trước/ })).toBeUndefined()
+  await ui.unmount()
+
+  await clock.advance(79_000)
+  await $.turn.complete({ reason: 'answer', answer: '', durationMs: 1, isAborted: false, turnId: 't1' } as never)
+  ui = await $.ui.mount({ plugin: 'glancedeck', surface: 'terminal', ...PANE })
+  expect(await ui.find({ text: /✗ lượt trước · 1:19/ })).toBeDefined()
+  await ui.unmount()
+})

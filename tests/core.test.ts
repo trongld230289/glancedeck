@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { applyStep, describeCall, fmtElapsed, kTokens, promptText, pushLog, LOG_MAX } from '../hooks/core'
+import { applyStep, describeCall, fmtElapsed, kTokens, laneSpan, laneText, prettyModel, promptText, pushLog, LOG_MAX } from '../hooks/core'
 import type { AgentCard } from '../types'
 
 const card: AgentCard = { id: 'a', name: 'x', ctx: 0, out: 0, spawnedAt: 0, endedAt: null, status: 'running', tools: [], answer: '' }
@@ -36,4 +36,15 @@ test('numbers read short', () => {
   expect(kTokens(1_500_000)).toBe('1.5M')
   expect(fmtElapsed(158_000)).toBe('2:38')
   expect(fmtElapsed(3_900_000)).toBe('1h05')
+})
+
+test('model ids read as names; lanes share one time axis', () => {
+  expect(prettyModel('claude-opus-5-5')).toBe('Opus 5.5')
+  expect(prettyModel('claude-haiku-5-5-20260101')).toBe('Haiku 5.5')
+  expect(prettyModel('')).toBe('Claude')
+  expect(laneSpan(0, 100, 0, 50, 20)).toEqual({ from: 0, to: 10 })
+  expect(laneSpan(0, 100, 50, 100, 20)).toEqual({ from: 10, to: 20 })
+  expect(laneSpan(0, 100, 99, 100, 20)).toEqual({ from: 19, to: 20 })
+  const x = laneText(0, 100, 25, 75, 8)
+  expect(x.before + x.bar + x.after).toBe('··━━━━··')
 })
