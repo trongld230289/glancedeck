@@ -50,7 +50,7 @@ test('rows: others only, live only, whoever waits on you first', () => {
   const rows = rowsOf(beats, 'self', NOW)
   expect(rows.map(r => r.sessionId)).toEqual(['ask', 'busy', 'idle'])
   expect(rows[0]).toMatchObject({ status: 'waiting', account: 'acc2', activity: 'xoá migration cũ?' })
-  expect(rows[2]?.activity).toBe('rảnh')
+  expect(rows[2]?.activity).toBe('idle')
 })
 
 test('two live sessions on one repo: the one that started first sends the queue', () => {
@@ -78,7 +78,7 @@ test('the all tab merges the other sessions’ prompts, questions, errors and ed
     ],
   })
   const merged = mergeLogs([{ at: NOW - 4000, who: 'you', label: 'you', text: 'hi' }], [other], 'self', NOW)
-  expect(merged.map(l => l.text)).toEqual(['hi', 'acme-api hỏi: hỏi: xoá migration cũ?'])
+  expect(merged.map(l => l.text)).toEqual(['hi', 'acme-api asks: hỏi: xoá migration cũ?'])
   expect(merged[1]).toMatchObject({ who: 'peer', label: '@acc2' })
 })
 
@@ -116,5 +116,5 @@ test('heartbeats and questions are read leniently', () => {
   expect(parseHeartbeat(JSON.stringify({ sessionId: 'x' }))).toBeNull()
   expect(parseHeartbeat(JSON.stringify({ sessionId: 'x', project: 'p', updatedAt: 5, status: 'weird' }))?.status).toBe('idle')
   expect(questionOf({ questions: [{ question: 'Public or private?' }] })).toBe('Public or private?')
-  expect(questionOf({})).toBe('đang hỏi bạn')
+  expect(questionOf({})).toBe('asking you')
 })

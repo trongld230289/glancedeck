@@ -89,9 +89,9 @@ test('other sessions show up across accounts; one waiting 3 minutes alerts once;
   expect(await pane.find({ text: /! acme-api/ })).toBeDefined()
   expect(await pane.find({ text: '@acc2' })).toBeDefined()
   expect(await pane.find({ text: /Bash → npm run build/ })).toBeDefined()
-  expect(await pane.find({ text: /1 chờ bạn/ })).toBeDefined()
+  expect(await pane.find({ text: /1 waiting/ })).toBeDefined()
   await pane.press({ key: 'l-tab-all' })
-  expect(await pane.find({ text: /acme-api hỏi/ })).toBeDefined()
+  expect(await pane.find({ text: /acme-api asks/ })).toBeDefined()
   await pane.unmount()
 
   // This session's own heartbeat is in the shared folder for the others.
@@ -103,7 +103,7 @@ test('other sessions show up across accounts; one waiting 3 minutes alerts once;
   await clock.advance(5000)
   others(clock.now())
   await clock.advance(5000)
-  expect(toasts.filter(t => /chờ bạn đã 3 phút/.test(t)).length).toBe(1)
+  expect(toasts.filter(t => /waiting for you for 3 min/.test(t)).length).toBe(1)
   expect(ran.filter(a => a[0] === 'powershell').length).toBe(1)
 
   // m on a queue item, then pick the session: the item moves to that session's queue file.

@@ -207,7 +207,7 @@ async function tick($: EngineInterface, isGone = false) {
     queueKey: key,
     account: accountOf(configDir),
     status: kind,
-    activity: kind === 'waiting' ? (rt.question ?? 'chờ bạn') : (last?.text ?? ''),
+    activity: kind === 'waiting' ? (rt.question ?? 'waiting for you') : (last?.text ?? ''),
     since: status.since,
     startedAt,
     updatedAt: isGone ? 0 : now,
@@ -249,7 +249,7 @@ async function tick($: EngineInterface, isGone = false) {
     if (await $.fs.exists(mark)) continue
     await $.fs.write(mark, JSON.stringify({ at: now, by: id }))
     const who = `${due.beat.project}${due.beat.account ? ` @${due.beat.account}` : ''}`
-    $.ui.toast(`glancedeck: ${who} chờ bạn đã 3 phút: ${due.beat.activity}`, { timeoutMs: 10_000 })
+    $.ui.toast(`glancedeck: ${who} has been waiting for you for 3 min: ${due.beat.activity}`, { timeoutMs: 10_000 })
     await playAlert($)
   }
 }
@@ -287,7 +287,7 @@ async function cancelCountdown($: EngineInterface, why: 'typed' | 'cancel' | 'tu
   await setRuntime($, r => ({ ...r, countdown: null }))
   if (why === 'cancel') await changeQueue($, q => ({ ...q, paused: true, pauseReason: 'cancel' }))
   if (why !== 'turn')
-    await say($, { who: 'queue', label: 'queue', text: why === 'typed' ? 'huỷ lần gửi: bạn đang gõ' : 'huỷ lần gửi, queue dừng' })
+    await say($, { who: 'queue', label: 'queue', text: why === 'typed' ? 'send cancelled: you are typing' : 'send cancelled, queue paused' })
 }
 
 /** Reads this account's 5-hour window afresh; the plain call is free. */
@@ -302,9 +302,9 @@ async function holdForUsage($: EngineInterface, rt: Runtime, now: number) {
   if (!w) return
   if (!usageHeld) {
     usageHeld = true
-    const until = w.resetsAt ? ` đến ${fmtClock(w.resetsAt).slice(0, 5)}` : ''
-    $.ui.toast(`glancedeck: queue dừng vì 5h đã dùng ${w.percent}%${until}.`)
-    await say($, { who: 'queue', label: 'queue', text: `dừng: 5h ${w.percent}% > ${USAGE_LIMIT}%${until}` })
+    const until = w.resetsAt ? ` until ${fmtClock(w.resetsAt).slice(0, 5)}` : ''
+    $.ui.toast(`glancedeck: queue paused: 5h usage at ${w.percent}%${until}.`)
+    await say($, { who: 'queue', label: 'queue', text: `paused: 5h ${w.percent}% > ${USAGE_LIMIT}%${until}` })
   }
   resetTimer?.cancel()
   resetTimer = w.resetsAt
@@ -325,7 +325,7 @@ async function maybeStart($: EngineInterface) {
     usageHeld = false
     resetTimer?.cancel()
     resetTimer = null
-    if (q.items.length > 0) await say($, { who: 'queue', label: 'queue', text: 'chạy lại: cửa sổ 5h đã reset' })
+    if (q.items.length > 0) await say($, { who: 'queue', label: 'queue', text: 'resumed: 5h window reset' })
   }
   if (!shouldStart(q, rt, now)) return
   const head = q.items[0]
@@ -348,11 +348,11 @@ async function sendHead($: EngineInterface, id: string, isForced: boolean) {
   if (result.kind === 'none') return
   await saveQueue($, result.queue)
   if (result.kind === 'block') {
-    $.ui.toast(`glancedeck: chưa gửi "${shorten(result.item.text, 40)}": lượt trước có lỗi (--if-ok). Queue đã dừng.`)
-    await say($, { who: 'queue', label: 'queue', text: `giữ lại (--if-ok): ${shorten(result.item.text, 40)}`, isError: true })
+    $.ui.toast(`glancedeck: not sent "${shorten(result.item.text, 40)}": the last turn had errors (--if-ok). Queue paused.`)
+    await say($, { who: 'queue', label: 'queue', text: `held (--if-ok): ${shorten(result.item.text, 40)}`, isError: true })
     return
   }
-  await say($, { who: 'queue', label: 'queue', text: `gửi: ${shorten(result.item.text, 60)}` })
+  await say($, { who: 'queue', label: 'queue', text: `sent: ${shorten(result.item.text, 60)}` })
   await $.prompt.submit({ text: result.item.text, asUser: true })
 }
 
@@ -542,7 +542,7 @@ export const register: Register = on => {
       await setAgents($, list => [...list, card].slice(-AGENTS_MAX))
       if (!e.parentAgentId) await setTurn($, t => (t.endedAt === null && t.startedAt !== null ? { ...t, agents: t.agents + 1 } : t))
       if (e.background && !e.parentAgentId) await setRuntime($, r => ({ ...r, background: [...r.background, agentId] }))
-      await say($, { who: 'agent', label: await agentLabel($, card.id), text: `bắt đầu · ${card.name}` })
+      await say($, { who: 'agent', label: await agentLabel($, card.id), text: `started · ${card.name}` })
     })
 
     return started
@@ -568,7 +568,7 @@ export const register: Register = on => {
       const question = questionOf(e)
       await quietly($, 'asking on', async () => {
         await setRuntime($, r => ({ ...r, isAsking: true, question }))
-        await say($, { who: 'main', label: 'main', text: `hỏi: ${question}`, isQuestion: true })
+        await say($, { who: 'main', label: 'main', text: `asks: ${question}`, isQuestion: true })
         await tick($)
       })
     }
@@ -622,7 +622,7 @@ export const register: Register = on => {
         await say($, {
           who: 'agent',
           label: await agentLabel($, id),
-          text: status === 'done' ? `xong · ${fmtElapsed(now - (card?.spawnedAt ?? now))}` : `dừng (${e.reason})`,
+          text: status === 'done' ? `done · ${fmtElapsed(now - (card?.spawnedAt ?? now))}` : `stopped (${e.reason})`,
           ...(status === 'failed' ? { isError: true } : {}),
         })
       }
@@ -659,17 +659,17 @@ export const register: Register = on => {
     return (
       <Box>
         <Text color={isHeld ? C.alarm : C.queue} bold>
-          {isHeld ? '✗ giữ lại ' : '⏳ sắp gửi '}
+          {isHeld ? '✗ held ' : '⏳ sending soon '}
         </Text>
         <Text color={C.text} wrap="truncate">
           {shorten(head.text, Math.max(10, e.props.bodyColumns - 34))}
         </Text>
         <Text> </Text>
-        <Button key="band-send" label={isHeld ? 'Vẫn gửi' : 'Gửi ngay'} hotkey="n" onPress={() => sendNow($)} />
+        <Button key="band-send" label={isHeld ? 'Send anyway' : 'Send now'} hotkey="n" onPress={() => sendNow($)} />
         <Text> </Text>
         <Button
           key="band-cancel"
-          label={isHeld ? 'Bỏ' : 'Huỷ'}
+          label={isHeld ? 'Drop' : 'Cancel'}
           hotkey="x"
           onPress={() => (isHeld ? changeQueue($, x => ({ ...x, items: x.items.slice(1) })) : cancelCountdown($, 'cancel'))}
         />
@@ -749,30 +749,30 @@ export const register: Register = on => {
     const isQueueFocused = e.props.isFocused && v.focusBlock === 'queue'
     const usageHold = isUsageBlocked(rt, now) && rt.fiveHour ? rt.fiveHour : null
     const autoText = (head ? !isSender(head, rt) : !rt.isQueueOwner)
-      ? 'phiên khác gửi'
+      ? 'another session sends'
       : q.paused
         ? q.pauseReason === 'if-ok'
-          ? 'dừng: lỗi'
+          ? 'paused: error'
           : 'auto off'
         : usageHold
-          ? `dừng: 5h ${Math.round(usageHold.percent)}%`
+          ? `paused: 5h ${Math.round(usageHold.percent)}%`
           : 'auto on'
     const autoColor = q.paused ? (q.pauseReason === 'if-ok' ? C.alarm : C.dim) : usageHold ? C.sessions : C.jade
     const itemRight = (item: QueueItem, i: number) =>
       item.isBlocked ? (
-        <Text color={C.alarm}>✗ có lỗi</Text>
+        <Text color={C.alarm}>✗ error</Text>
       ) : i === 0 ? (
         q.paused ? (
-          <Text color={C.dim}>⏸ dừng</Text>
+          <Text color={C.dim}>⏸ paused</Text>
         ) : (
           <Text color={C.queue} bold>
-            kế tiếp
+            next
           </Text>
         )
       ) : item.ifOk ? (
-        <Text color={C.sessions}>nếu 0 lỗi</Text>
+        <Text color={C.sessions}>if no errors</Text>
       ) : (
-        <Text color={C.faint}>chờ</Text>
+        <Text color={C.faint}>waiting</Text>
       )
     const editor = (key: string, value: string, onSubmit: (text: string) => Promise<unknown>) => (
       <Box key={key} width={inner}>
@@ -781,7 +781,7 @@ export const register: Register = on => {
             key={key}
             label=""
             value={value}
-            placeholder="việc cần Claude làm tiếp…"
+            placeholder="what Claude should do next…"
             autoFocus
             onSubmit={(text: string) => {
               void setView($, x => ({ ...x, editing: null }))
@@ -789,7 +789,7 @@ export const register: Register = on => {
             }}
           />
         ) : (
-          <Text color={C.faint}>Dùng /q &lt;việc&gt; trên thiết bị này.</Text>
+          <Text color={C.faint}>Use /q &lt;task&gt; on this device.</Text>
         )}
       </Box>
     )
@@ -845,13 +845,13 @@ export const register: Register = on => {
         'QUEUE',
         C.queue,
         <Text color={C.dim}>
-          {` · ${q.items.length} chờ · `}
+          {` · ${q.items.length} queued · `}
           <Text color={autoColor}>{autoText}</Text>
         </Text>,
         usageHold?.resetsAt ? (
-          <Text color={C.sessions}>{`↻ chạy lại sau ${fmtUntil(usageHold.resetsAt - now)}`}</Text>
+          <Text color={C.sessions}>{`↻ resumes in ${fmtUntil(usageHold.resetsAt - now)}`}</Text>
         ) : (
-          <Text color={C.faint}>{`dừng nếu 5h>${USAGE_LIMIT}%`}</Text>
+          <Text color={C.faint}>{`pauses if 5h>${USAGE_LIMIT}%`}</Text>
         ),
       ),
       ...(isOpen('queue')
@@ -859,17 +859,17 @@ export const register: Register = on => {
             ...q.items.map(itemRow),
             ...(v.editing === 'new' ? [editor('q-new', '', text => addItem($, text, false))] : []),
             ...(q.items.length === 0 && v.editing !== 'new'
-              ? [row('q-empty', <Text color={C.faint}>/q &lt;việc&gt; hoặc q để thêm. Gửi khi Claude rảnh.</Text>, null)]
+              ? [row('q-empty', <Text color={C.faint}>/q &lt;task&gt; or q to add. Sent when Claude is idle.</Text>, null)]
               : []),
-            ...(sentToday > 0 ? [row('q-sent', <Text color={C.faint}>{`✓ đã gửi hôm nay: ${sentToday}`}</Text>, null)] : []),
+            ...(sentToday > 0 ? [row('q-sent', <Text color={C.faint}>{`✓ sent today: ${sentToday}`}</Text>, null)] : []),
             ...(isQueueFocused && q.items.length > 0
               ? [
                   <Box key="q-keys" width={inner}>
-                    {act('q-k-up', 'k', 'lên', () => selected && changeQueue($, x => move(x, selected, -1)))}
+                    {act('q-k-up', 'k', 'up', () => selected && changeQueue($, x => move(x, selected, -1)))}
                     <Text color={C.faint}> </Text>
-                    {act('q-k-down', 'j', 'xuống', () => selected && changeQueue($, x => move(x, selected, 1)))}
+                    {act('q-k-down', 'j', 'down', () => selected && changeQueue($, x => move(x, selected, 1)))}
                     <Text color={C.faint}> </Text>
-                    {act('q-k-edit', 'e', 'sửa', async () => {
+                    {act('q-k-edit', 'e', 'edit', async () => {
                       if (!selected) return
                       await setView($, x => ({ ...x, editing: selected }))
                       await focusInput($, `q-edit-${selected}`)
@@ -878,18 +878,18 @@ export const register: Register = on => {
                     {act(
                       'q-k-del',
                       'd',
-                      'xoá',
+                      'delete',
                       () => selected && changeQueue($, x => ({ ...x, items: x.items.filter(i => i.id !== selected) })),
                     )}
                     <Text color={C.faint}> </Text>
-                    {act('q-k-pause', 'p', q.paused ? 'chạy' : 'dừng', () => (q.paused ? resume($) : pause($)))}
+                    {act('q-k-pause', 'p', q.paused ? 'resume' : 'pause', () => (q.paused ? resume($) : pause($)))}
                     <Text color={C.faint}> </Text>
-                    {act('q-k-now', 'n', 'gửi', () => sendNow($))}
+                    {act('q-k-now', 'n', 'send', () => sendNow($))}
                     <Text color={C.faint}> </Text>
                     {act(
                       'q-k-move',
                       'm',
-                      'sang phiên',
+                      'to session',
                       () => selected && setView($, x => ({ ...x, picking: { kind: 'move', itemId: selected } })),
                     )}
                   </Box>,
@@ -910,7 +910,7 @@ export const register: Register = on => {
         if (item) {
           await queueInto($, s.queueKey, item.text, false)
           await changeQueue($, x => ({ ...x, items: x.items.filter(i => i.id !== item.id) }))
-          await say($, { who: 'queue', label: 'queue', text: `chuyển sang ${s.project}: ${shorten(item.text, 40)}` })
+          await say($, { who: 'queue', label: 'queue', text: `moved to ${s.project}: ${shorten(item.text, 40)}` })
         }
         await setView($, x => ({ ...x, picking: null }))
       } else {
@@ -930,17 +930,17 @@ export const register: Register = on => {
         'sessions',
         'SESSIONS',
         C.sessions,
-        <Text color={C.dim}>{sessions.length === 0 ? ' · không có phiên khác' : ` · ${sessions.length} khác`}</Text>,
+        <Text color={C.dim}>{sessions.length === 0 ? ' · no other sessions' : ` · ${sessions.length} other`}</Text>,
         picking ? (
           <Button key="s-pick-cancel" plain onPress={() => setView($, x => ({ ...x, picking: null }))}>
-            <Text color={C.sessions}>chọn phiên · huỷ</Text>
+            <Text color={C.sessions}>pick a session · cancel</Text>
           </Button>
         ) : waiting > 0 ? (
-          <Text color={C.sessions} bold>{`${waiting} chờ bạn`}</Text>
+          <Text color={C.sessions} bold>{`${waiting} waiting`}</Text>
         ) : null,
       ),
       ...(isOpen('sessions') && picking && targets.length === 0
-        ? [row('s-none', <Text color={C.faint}>Không có phiên nào ở repo khác để gửi sang.</Text>, null)]
+        ? [row('s-none', <Text color={C.faint}>No sessions in other repos to send to.</Text>, null)]
         : []),
       ...(isOpen('sessions') && picking
         ? targets.map((s, i) =>
@@ -951,7 +951,7 @@ export const register: Register = on => {
                 <Text color={C.text}>{s.project}</Text>
                 {s.account ? <Text color={C.rose}>{` @${s.account}`}</Text> : null}
               </Button>,
-              <Text color={C.dim}>{s.status === 'done' ? 'rảnh' : 'xếp hàng'}</Text>,
+              <Text color={C.dim}>{s.status === 'done' ? 'idle' : 'queues it'}</Text>,
             ),
           )
         : []),
@@ -963,18 +963,18 @@ export const register: Register = on => {
                 <Input
                   key="s-msg-input"
                   label=""
-                  placeholder="nhắn như lời bạn, gửi khi phiên đó rảnh…"
+                  placeholder="message as if from you, sent when that session is idle…"
                   autoFocus
                   onSubmit={(text: string) => {
                     void setView($, x => ({ ...x, messageTo: null }))
                     if (text.trim()) {
                       void queueInto($, messageTarget.queueKey, text.trim(), true, messageTarget.sessionId)
-                      void say($, { who: 'queue', label: 'queue', text: `nhắn ${messageTarget.project}: ${shorten(text.trim(), 40)}` })
+                      void say($, { who: 'queue', label: 'queue', text: `message ${messageTarget.project}: ${shorten(text.trim(), 40)}` })
                     }
                   }}
                 />
               ) : (
-                <Text color={C.faint}>không nhập được trên thiết bị này</Text>
+                <Text color={C.faint}>no text input on this device</Text>
               )}
             </Box>,
           ]
@@ -1048,8 +1048,8 @@ export const register: Register = on => {
         'agents',
         'AGENTS',
         C.agents,
-        <Text color={C.dim}>{totalAgents === 0 ? ' · chưa có' : ` · ${running} running · ${totalAgents} total`}</Text>,
-        shown.length > 0 ? <Text color={C.faint}>{shown.length === 1 ? 'phím 1: xem việc' : `phím 1-${shown.length}: xem việc`}</Text> : null,
+        <Text color={C.dim}>{totalAgents === 0 ? ' · none yet' : ` · ${running} running · ${totalAgents} total`}</Text>,
+        shown.length > 0 ? <Text color={C.faint}>{shown.length === 1 ? 'key 1: view work' : `keys 1-${shown.length}: view work`}</Text> : null,
       ),
       ...(isOpen('agents')
         ? shown.flatMap((c, j) => {
@@ -1069,9 +1069,9 @@ export const register: Register = on => {
               ),
               ...(v.expandedAgent === i && expanded
                 ? [
-                    row(`a-${j}-tok`, <Text color={C.faint}>{`   ${kTokens(expanded.ctx)} context · ${kTokens(expanded.out)} viết ra`}</Text>, null),
+                    row(`a-${j}-tok`, <Text color={C.faint}>{`   ${kTokens(expanded.ctx)} context · ${kTokens(expanded.out)} output`}</Text>, null),
                     ...(expanded.tools.length === 0
-                      ? [row(`a-${j}-none`, <Text color={C.faint}>{'   chưa gọi tool nào'}</Text>, null)]
+                      ? [row(`a-${j}-none`, <Text color={C.faint}>{'   no tool calls yet'}</Text>, null)]
                       : []),
                     ...expanded.tools.map((t, k) => row(`a-${j}-t${k}`, <Text color={C.dim} wrap="truncate">{`   · ${t}`}</Text>, null)),
                     ...(expanded.answer
@@ -1115,9 +1115,9 @@ export const register: Register = on => {
     const isTurnOk = t.errors === 0 && (t.reason === null || t.reason === 'answer')
     const stats = (
       <Text color={C.dim}>
-        <Text color={t.edits > 0 ? C.text : C.dim}>{`${t.edits} sửa`}</Text>
+        <Text color={t.edits > 0 ? C.text : C.dim}>{`${t.edits} edits`}</Text>
         {' · '}
-        <Text color={t.errors > 0 ? C.alarm : C.dim}>{`${t.errors} lỗi`}</Text>
+        <Text color={t.errors > 0 ? C.alarm : C.dim}>{`${t.errors} errors`}</Text>
         {' · '}
         <Text color={t.agents > 0 ? C.agents : C.dim}>{`${t.agents} agent`}</Text>
       </Text>
@@ -1134,15 +1134,15 @@ export const register: Register = on => {
         t.startedAt === null ? null : stats,
       ),
       t.startedAt === null ? (
-        row('t-none', <Text color={C.faint}>chưa có lượt nào</Text>, null)
+        row('t-none', <Text color={C.faint}>no turns yet</Text>, null)
       ) : isTurnLive ? (
         row(
           't-now',
           hasClient ? (
-            <els.Client key="t-spin-label" module="./spin.tsx" props={{ color: C.ember, label: 'đang làm', bold: true, now }} />
+            <els.Client key="t-spin-label" module="./spin.tsx" props={{ color: C.ember, label: 'working', bold: true, now }} />
           ) : (
             <Text color={C.ember} bold>
-              ● đang làm
+              ● working
             </Text>
           ),
           hasClient ? (
@@ -1159,8 +1159,8 @@ export const register: Register = on => {
         row(
           't-last',
           <Text color={isTurnOk ? C.jade : C.alarm}>
-            {`${isTurnOk ? '✓' : '✗'} lượt trước · ${fmtElapsed((t.endedAt ?? now) - t.startedAt)}`}
-            {t.reason && t.reason !== 'answer' ? ` · dừng (${t.reason})` : ''}
+            {`${isTurnOk ? '✓' : '✗'} last turn · ${fmtElapsed((t.endedAt ?? now) - t.startedAt)}`}
+            {t.reason && t.reason !== 'answer' ? ` · stopped (${t.reason})` : ''}
           </Text>,
           <Text color={C.faint}>{`xong ${fmtClock(t.endedAt ?? now)}`}</Text>,
         )
@@ -1213,7 +1213,7 @@ export const register: Register = on => {
         'l-head',
         <Button key="l-head" plain onPress={fold('log')}>
           <Text color={C.text} bold>{`${isOpen('log') ? '' : '▸ '}SESSION LOG`}</Text>
-          {logLines.length === 0 ? <Text color={C.dim}> · chưa có</Text> : null}
+          {logLines.length === 0 ? <Text color={C.dim}> · none yet</Text> : null}
         </Button>,
         <Box>
           {tab('this')}
@@ -1243,8 +1243,8 @@ export const register: Register = on => {
             </Text>
           </Box>
           <Box flexShrink={0}>
-            {chip(C.sessions, `${waiting} chờ bạn`, waiting > 0)}
-            {chip(C.queue, `${q.items.length} chờ gửi`, q.items.length > 0)}
+            {chip(C.sessions, `${waiting} waiting`, waiting > 0)}
+            {chip(C.queue, `${q.items.length} queued`, q.items.length > 0)}
             {chip(C.agents, `${running} agent`, running > 0)}
           </Box>
         </Box>
@@ -1256,18 +1256,18 @@ export const register: Register = on => {
         {e.props.isFocused ? null : (
           <Box width={W}>
             <Text color={C.faint} wrap="truncate">
-              <Text color={C.dim} bold>ctrl+x</Text> rồi <Text color={C.dim} bold>tab</Text> để vào glancedeck, rồi{' '}
-              <Text color={C.dim} bold>↑↓</Text> để di chuyển
+              <Text color={C.dim} bold>ctrl+x</Text> then <Text color={C.dim} bold>tab</Text> to enter glancedeck, then{' '}
+              <Text color={C.dim} bold>↑↓</Text> to move
             </Text>
           </Box>
         )}
         <Box width={W}>
-          <Text color={C.faint}>↑↓ di chuyển · </Text>
+          <Text color={C.faint}>↑↓ move · </Text>
           <Button key="f-queue" plain hotkey="q" onPress={async () => {
               await setView($, x => ({ ...x, editing: 'new', focusBlock: 'queue' }))
               await focusInput($, 'q-new')
             }}>
-            thêm queue
+            add to queue
           </Button>
           <Text color={C.faint}> · </Text>
           <Button
@@ -1276,7 +1276,7 @@ export const register: Register = on => {
             hotkey="s"
             onPress={() => setView($, x => ({ ...x, picking: { kind: 'message' }, focusBlock: 'sessions' }))}
           >
-            nhắn phiên
+            message session
           </Button>
           <Text color={C.faint}> · </Text>
           <Button
@@ -1285,7 +1285,7 @@ export const register: Register = on => {
             hotkey="c"
             onPress={() => setView($, x => ({ ...x, collapsed: toggle(x.collapsed, x.focusBlock) }))}
           >
-            thu gọn
+            collapse
           </Button>
         </Box>
       </Box>

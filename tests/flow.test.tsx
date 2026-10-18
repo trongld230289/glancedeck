@@ -76,7 +76,7 @@ test('/q while idle counts down 5 seconds, then sends the text as the person', a
   await q($, 'viết test cho install.py')
 
   const band = await $.ui.mount({ plugin: 'glancedeck', surface: 'terminal', ...BAND })
-  expect(await band.find({ text: /sắp gửi/ })).toBeDefined()
+  expect(await band.find({ text: /sending soon/ })).toBeDefined()
   await band.unmount()
   expect(w.submitted).toEqual([])
 
@@ -118,17 +118,17 @@ test('--if-ok after a turn with a failed tool call is held, the queue pauses and
   await w.clock.advance(5000)
 
   expect(w.submitted).toEqual([])
-  expect(w.toasts.some(t => /lượt trước có lỗi/.test(t))).toBe(true)
+  expect(w.toasts.some(t => /last turn had errors/.test(t))).toBe(true)
   const stored = JSON.parse(w.queueText())
   expect(stored.paused).toBe(true)
   expect(stored.pauseReason).toBe('if-ok')
 
   const pane = await $.ui.mount({ plugin: 'glancedeck', surface: 'terminal', ...PANE })
-  expect(await pane.find({ text: /có lỗi/ })).toBeDefined()
+  expect(await pane.find({ text: /✗ error/ })).toBeDefined()
   await pane.unmount()
 })
 
-test('Huỷ in the band cancels and pauses; Gửi ngay sends at once', async ($, on) => {
+test('Cancel in the band cancels and pauses; Send now sends at once', async ($, on) => {
   const w = world(on)
   await q($, 'một')
   let band = await $.ui.mount({ plugin: 'glancedeck', surface: 'terminal', ...BAND })
@@ -173,16 +173,16 @@ test('over 90% of the 5h window holds the queue, says so once, and goes on by it
   await q($, 'chạy test sau khi reset')
   await w.clock.advance(10_000)
   expect(w.submitted).toEqual([])
-  expect(w.toasts.filter(t => /5h đã dùng 93%/.test(t)).length).toBe(1)
+  expect(w.toasts.filter(t => /5h usage at 93%/.test(t)).length).toBe(1)
 
   const pane = await $.ui.mount({ plugin: 'glancedeck', surface: 'terminal', ...PANE })
-  expect(await pane.find({ text: /dừng: 5h 93%/ })).toBeDefined()
-  expect(await pane.find({ text: /chạy lại sau 30m/ })).toBeDefined()
+  expect(await pane.find({ text: /paused: 5h 93%/ })).toBeDefined()
+  expect(await pane.find({ text: /resumes in 30m/ })).toBeDefined()
   await pane.unmount()
 
   // A second item while held: still no second toast.
   await q($, 'việc thứ hai')
-  expect(w.toasts.filter(t => /5h đã dùng/.test(t)).length).toBe(1)
+  expect(w.toasts.filter(t => /5h usage at/.test(t)).length).toBe(1)
 
   // The window resets: the stale 93% no longer holds the queue.
   await w.clock.set(resetsAt + 2000)

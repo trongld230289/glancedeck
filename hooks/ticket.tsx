@@ -21,7 +21,7 @@ const Ticket: ClientModule<Props, State> = (props, surface) => {
   }
   const leftMs = Math.max(0, props.endsAt - (props.now + ref.ticks * 1000))
   const seconds = Math.ceil(leftMs / 1000)
-  const right = ` gửi sau ${seconds}s `
+  const right = ` sending in ${seconds}s `
   const room = Math.max(4, props.width - right.length)
   const label = props.left.length > room ? `${props.left.slice(0, room - 1)}…` : props.left.padEnd(room)
   const line = label + right

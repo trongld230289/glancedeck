@@ -53,7 +53,7 @@ Focus the pane with `ctrl+x tab`; Tab and the arrows walk the rows, Enter presse
 
 ## How the queue sends
 
-The next item starts a 5-second countdown when the main turn has ended, no background subagent of this session is running, and Claude is not asking you a question. The band above the prompt then shows **[Gửi ngay]** (`n`) and **[Huỷ]** (`x`, also pauses the queue). Typing anything in the prompt box cancels that send; the item stays and the queue goes on after your turn.
+The next item starts a 5-second countdown when the main turn has ended, no background subagent of this session is running, and Claude is not asking you a question. The band above the prompt then shows **[Send now]** (`n`) and **[Cancel]** (`x`, also pauses the queue). Typing anything in the prompt box cancels that send; the item stays and the queue goes on after your turn.
 
 - `--if-ok` after a failed turn: the item is held, the queue pauses, a toast says why.
 - Over 90% of this account's 5-hour window: the queue holds and goes on by itself when the window resets.

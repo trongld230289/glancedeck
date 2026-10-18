@@ -23,8 +23,8 @@ test('the pane draws the four blocks at 58 columns', async ($, on) => {
   for (const title of ['QUEUE', 'SESSIONS', 'AGENTS', 'SESSION LOG']) {
     expect(await ui.find({ text: title })).toBeDefined()
   }
-  expect(await ui.find({ text: /\/q <việc>/ })).toBeDefined()
-  expect(await ui.find({ text: /AGENTS · chưa có|chưa có/ })).toBeDefined()
+  expect(await ui.find({ text: /\/q <task>/ })).toBeDefined()
+  expect(await ui.find({ text: /AGENTS · none yet|none yet/ })).toBeDefined()
   await ui.unmount()
 })
 
@@ -96,9 +96,9 @@ test('c folds the block that holds the focus; the all tab shows other sessions',
   mock.clock(on, { now: Date.UTC(2026, 9, 18, 10, 0, 0) })
   const ui = await $.ui.mount({ plugin: 'glancedeck', surface: 'terminal', ...PANE })
 
-  expect(await ui.find({ text: /\/q <việc>/ })).toBeDefined()
+  expect(await ui.find({ text: /\/q <task>/ })).toBeDefined()
   await ui.press({ key: 'f-collapse' })
-  expect(await ui.find({ text: /\/q <việc>/ })).toBeUndefined()
+  expect(await ui.find({ text: /\/q <task>/ })).toBeUndefined()
 
   await ui.press({ key: 'l-tab-all' })
   expect(await ui.find({ text: '[all]' })).toBeDefined()
@@ -112,7 +112,7 @@ test('the TURN block runs while the main turn does, then becomes a receipt', asy
   on('tool.call', (_, e) => (e.tool === 'Bash' ? { isError: true, result: 'exit 1', text: 'exit 1' } : { result: { ok: true } as never }))
 
   let ui = await $.ui.mount({ plugin: 'glancedeck', surface: 'terminal', ...PANE })
-  expect(await ui.find({ text: 'chưa có lượt nào' })).toBeDefined()
+  expect(await ui.find({ text: 'no turns yet' })).toBeDefined()
   await ui.unmount()
 
   await $.turn.start({ text: 'sửa lỗi', turnId: 't1' } as never)
@@ -120,14 +120,14 @@ test('the TURN block runs while the main turn does, then becomes a receipt', asy
   await $.tool.call({ tool: 'Bash', tool_use_id: 'b1', command: 'npm test' } as never)
   ui = await $.ui.mount({ plugin: 'glancedeck', surface: 'terminal', ...PANE })
   expect(await ui.find({ text: 'TURN' })).toBeDefined()
-  expect(await ui.find({ text: '1 sửa' })).toBeDefined()
-  expect(await ui.find({ text: '1 lỗi' })).toBeDefined()
-  expect(await ui.find({ text: /lượt trước/ })).toBeUndefined()
+  expect(await ui.find({ text: '1 edits' })).toBeDefined()
+  expect(await ui.find({ text: '1 errors' })).toBeDefined()
+  expect(await ui.find({ text: /last turn/ })).toBeUndefined()
   await ui.unmount()
 
   await clock.advance(79_000)
   await $.turn.complete({ reason: 'answer', answer: '', durationMs: 1, isAborted: false, turnId: 't1' } as never)
   ui = await $.ui.mount({ plugin: 'glancedeck', surface: 'terminal', ...PANE })
-  expect(await ui.find({ text: /✗ lượt trước · 1:19/ })).toBeDefined()
+  expect(await ui.find({ text: /✗ last turn · 1:19/ })).toBeDefined()
   await ui.unmount()
 })

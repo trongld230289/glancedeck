@@ -69,7 +69,7 @@ export const rowOf = (h: Heartbeat, now: number): SessionRow & { sessionId: stri
   status: h.status === 'idle' ? 'done' : h.status,
   project: h.project,
   account: h.account,
-  activity: h.status === 'idle' ? 'rảnh' : shorten(h.activity || (h.status === 'waiting' ? 'chờ bạn' : 'đang làm'), 40),
+  activity: h.status === 'idle' ? 'idle' : shorten(h.activity || (h.status === 'waiting' ? 'waiting for you' : 'working'), 40),
   elapsed: fmtUntil(now - h.since),
 })
 
@@ -103,7 +103,7 @@ export const mergeLogs = (own: readonly LogLine[], beats: readonly Heartbeat[], 
           ...l,
           who: 'peer' as const,
           label: h.account ? `@${h.account}` : shorten(h.project, 8),
-          text: l.isQuestion ? `${h.project} hỏi: ${l.text}` : `${h.project}: ${l.text}`,
+          text: l.isQuestion ? `${h.project} asks: ${l.text}` : `${h.project}: ${l.text}`,
           path: undefined,
         })),
     )
@@ -132,5 +132,5 @@ export const questionOf = (input: unknown): string => {
   const qs = typeof input === 'object' && input !== null ? (input as { questions?: unknown }).questions : undefined
   const first = Array.isArray(qs) ? qs[0] : undefined
   const text = typeof first === 'object' && first !== null ? (first as { question?: unknown }).question : undefined
-  return typeof text === 'string' ? shorten(text, 60) : 'đang hỏi bạn'
+  return typeof text === 'string' ? shorten(text, 60) : 'asking you'
 }
