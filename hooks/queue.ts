@@ -12,6 +12,8 @@ export const IDLE: Runtime = {
   countdown: null,
   fiveHour: null,
   isQueueOwner: true,
+  selfId: null,
+  queuePeers: [],
   question: null,
 }
 
@@ -69,8 +71,14 @@ export const normalizeQueue = (x: unknown): QueueFile => {
 /** The session is free for the next item: no turn, no background agent, no open question, no countdown. */
 export const isFree = (rt: Runtime) => !rt.isTurnRunning && rt.background.length === 0 && !rt.isAsking && rt.countdown === null
 
-export const shouldStart = (q: QueueFile, rt: Runtime, now: number) =>
-  rt.isQueueOwner && !q.paused && q.items.length > 0 && !q.items[0]?.isBlocked && isFree(rt) && !isUsageBlocked(rt, now)
+/** This session sends `item`: it was queued here, or its own session is gone and this one owns the queue. */
+export const isSender = (item: QueueItem, rt: Runtime) =>
+  item.sender && rt.queuePeers.includes(item.sender) ? item.sender === rt.selfId : rt.isQueueOwner
+
+export const shouldStart = (q: QueueFile, rt: Runtime, now: number) => {
+  const head = q.items[0]
+  return Boolean(head) && isSender(head!, rt) && !q.paused && !head!.isBlocked && isFree(rt) && !isUsageBlocked(rt, now)
+}
 
 export type Fire =
   { kind: 'send'; item: QueueItem; queue: QueueFile } | { kind: 'block'; item: QueueItem; queue: QueueFile } | { kind: 'none' }

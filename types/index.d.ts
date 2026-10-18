@@ -53,6 +53,8 @@ export type QueueItem = {
   /** Send only if the turn before it ended with no failed tool call. */
   ifOk: boolean
   addedAt: number
+  /** The session the item was queued in: it sends the item while it is live; otherwise the queue's owner does. */
+  sender?: string
   /** Held at the head: its --if-ok check failed. Cleared by resume, edit or send-now. */
   isBlocked?: true
 }
@@ -83,6 +85,9 @@ export type Runtime = {
   fiveHour: { percent: number; resetsAt: number | null } | null
   /** This session may send this project's queue: no other live session on it started earlier. */
   isQueueOwner: boolean
+  /** This session's id, and the live sessions sharing this queue (this one included). */
+  selfId: string | null
+  queuePeers: string[]
   /** What this session is asking you, while an AskUserQuestion is open. */
   question: string | null
 }

@@ -5,6 +5,7 @@ import {
   IDLE,
   fire,
   fiveHourOf,
+  isSender,
   isUsageBlocked,
   keepToday,
   move,
@@ -118,4 +119,18 @@ test('two folders with the same name get different queue files', () => {
   expect(projectKey('D:\\Project\\app')).not.toBe(projectKey('C:/work/app'))
   expect(projectKey('D:\\Project\\App\\')).toBe(projectKey('d:/project/app'))
   expect(projectKey('D:/Project/acme-web')).toMatch(/^acme-web-[a-z0-9]+$/)
+})
+
+test('an item goes out from the session it was queued in; the owner sends it once that session is gone', () => {
+  const here = { ...IDLE, selfId: 'a', queuePeers: ['a', 'b'], isQueueOwner: false }
+  const owner = { ...IDLE, selfId: 'b', queuePeers: ['a', 'b'], isQueueOwner: true }
+  const mine = withItems(item('1', { sender: 'a' }))
+  expect(isSender(mine.items[0]!, here)).toBe(true)
+  expect(shouldStart(mine, here, 0)).toBe(true)
+  expect(shouldStart(mine, owner, 0)).toBe(false)
+  // a is gone: the owner takes it
+  expect(shouldStart(mine, { ...owner, queuePeers: ['b'] }, 0)).toBe(true)
+  // an item with no sender is the owner's, as before
+  expect(shouldStart(withItems(item('2')), owner, 0)).toBe(true)
+  expect(shouldStart(withItems(item('2')), here, 0)).toBe(false)
 })

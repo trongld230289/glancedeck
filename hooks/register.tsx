@@ -26,6 +26,7 @@ import {
   USAGE_LIMIT,
   fire,
   fiveHourOf,
+  isSender,
   isUsageBlocked,
   keepToday,
   move,
@@ -35,7 +36,7 @@ import {
   projectKey,
   shouldStart,
 } from './queue'
-import { accountOf, dueAlerts, isQueueOwner, mergeLogs, parseHeartbeat, peerAgents, questionOf, rowOf, rowsOf, sharedAgents } from './sessions'
+import { accountOf, dueAlerts, isLive, isQueueOwner, mergeLogs, parseHeartbeat, peerAgents, questionOf, rowOf, rowsOf, sharedAgents } from './sessions'
 
 const PANE = 'glancedeck'
 const PANE_COLUMNS = 58
@@ -153,13 +154,13 @@ async function readQueueFile($: EngineInterface, path: string): Promise<QueueFil
 }
 
 /** Puts a prompt in another session's queue: that session's glancedeck sends it as the person's words. */
-async function queueInto($: EngineInterface, key: string, text: string, atFront: boolean) {
+async function queueInto($: EngineInterface, key: string, text: string, atFront: boolean, sender?: string) {
   const path = await queuePath($, key)
   if (!path) return
   const q = await readQueueFile($, path)
   const now = await $.clock.now()
   made += 1
-  const item: QueueItem = { id: newId(now, made), text, ifOk: false, addedAt: now }
+  const item: QueueItem = { id: newId(now, made), text, ifOk: false, addedAt: now, ...(sender ? { sender } : {}) }
   const items = atFront ? [item, ...q.items] : [...q.items, item]
   await $.fs.write(path, `${JSON.stringify({ ...q, items }, null, 2)}\n`)
 }
@@ -227,11 +228,15 @@ async function tick($: EngineInterface, isGone = false) {
   await update($, others, () => beats.filter(h => h.sessionId !== id))
   await update($, self, () => beat)
 
-  // Two sessions on one repo share its queue: only the one that started first sends it.
+  // Sessions on one repo share its queue: each item goes out from the session it was queued in,
+  // and the one that started first sends the items whose session is gone.
   const isOwner = isQueueOwner(beats, beat, now)
-  if (isOwner !== rt.isQueueOwner) {
-    if (!isOwner) await cancelCountdown($, 'turn')
-    await setRuntime($, r => ({ ...r, isQueueOwner: isOwner }))
+  const peers = beats.filter(h => h.queueKey === key && isLive(h, now)).map(h => h.sessionId)
+  if (isOwner !== rt.isQueueOwner || id !== rt.selfId || peers.join() !== rt.queuePeers.join()) {
+    const next = { ...rt, isQueueOwner: isOwner, selfId: id, queuePeers: peers }
+    const head = normalizeQueue(await read($, queue)).items[0]
+    if (rt.countdown && head && !isSender(head, next)) await cancelCountdown($, 'turn')
+    await setRuntime($, r => ({ ...r, isQueueOwner: isOwner, selfId: id, queuePeers: peers }))
   }
   // Another session may have changed this queue (an item sent here): read it back and go on.
   if (!rt.countdown) {
@@ -354,7 +359,8 @@ async function sendHead($: EngineInterface, id: string, isForced: boolean) {
 async function addItem($: EngineInterface, text: string, ifOk: boolean): Promise<QueueItem> {
   const now = await $.clock.now()
   made += 1
-  const item: QueueItem = { id: newId(now, made), text, ifOk, addedAt: now }
+  const sender = await $.session.id().catch(() => null)
+  const item: QueueItem = { id: newId(now, made), text, ifOk, addedAt: now, ...(sender ? { sender } : {}) }
   await changeQueue($, q => ({ ...q, items: [...q.items, item] }))
   await maybeStart($)
   return item
@@ -742,7 +748,7 @@ export const register: Register = on => {
     const selected = v.selected && q.items.some(i => i.id === v.selected) ? v.selected : (head?.id ?? null)
     const isQueueFocused = e.props.isFocused && v.focusBlock === 'queue'
     const usageHold = isUsageBlocked(rt, now) && rt.fiveHour ? rt.fiveHour : null
-    const autoText = !rt.isQueueOwner
+    const autoText = (head ? !isSender(head, rt) : !rt.isQueueOwner)
       ? 'phiên khác gửi'
       : q.paused
         ? q.pauseReason === 'if-ok'
@@ -962,7 +968,7 @@ export const register: Register = on => {
                   onSubmit={(text: string) => {
                     void setView($, x => ({ ...x, messageTo: null }))
                     if (text.trim()) {
-                      void queueInto($, messageTarget.queueKey, text.trim(), true)
+                      void queueInto($, messageTarget.queueKey, text.trim(), true, messageTarget.sessionId)
                       void say($, { who: 'queue', label: 'queue', text: `nhắn ${messageTarget.project}: ${shorten(text.trim(), 40)}` })
                     }
                   }}

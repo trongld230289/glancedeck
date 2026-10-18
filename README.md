@@ -58,7 +58,7 @@ The next item starts a 5-second countdown when the main turn has ended, no backg
 - `--if-ok` after a failed turn: the item is held, the queue pauses, a toast says why.
 - Over 90% of this account's 5-hour window: the queue holds and goes on by itself when the window resets.
 - A reopened session does not start sending on its own: it waits for its first turn to end, or `/q resume`.
-- Two sessions on one repo share its queue; only the one that started first sends it.
+- Two sessions on one repo share its queue file, but each item is sent by the session it was queued in; if that session is gone, the one that started first sends it.
 
 ## Files
 
