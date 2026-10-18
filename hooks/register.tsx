@@ -1199,28 +1199,28 @@ export const register: Register = on => {
     // The legend is also the summary: each block's color with the one number that matters in it.
     const chip = (color: string, value: string, isLive: boolean) => (
       <Text>
-        <Text color={color}>▍</Text>
-        <Text color={isLive ? C.text : C.dim} bold={isLive}>{`${value}  `}</Text>
+        <Text color={color}>{'  ● '}</Text>
+        <Text color={isLive ? C.text : C.faint} bold={isLive}>{value}</Text>
       </Text>
     )
 
     return (
       <Box flexDirection="column" width={W}>
-        <Box width={W}>
-          <Box flexGrow={1}>
+        <Box width={W} marginBottom={1}>
+          <Box flexGrow={1} flexShrink={1}>
             <Text wrap="truncate">
               <Text bold color={C.text}>
                 GLANCEDECK
               </Text>
-              <Text color={C.queue}>{`  ${basename(cwd)}`}</Text>
+              <Text color={C.faint}>{' · '}</Text>
+              <Text color={C.queue}>{basename(cwd)}</Text>
             </Text>
           </Box>
-        </Box>
-        <Box width={W}>
-          {chip(C.sessions, `${waiting} chờ bạn`, waiting > 0)}
-          {chip(C.queue, `${q.items.length} chờ gửi`, q.items.length > 0)}
-          {chip(C.agents, `${running} agent`, running > 0)}
-          {chip(C.log, 'log', false)}
+          <Box flexShrink={0}>
+            {chip(C.sessions, `${waiting} chờ bạn`, waiting > 0)}
+            {chip(C.queue, `${q.items.length} chờ gửi`, q.items.length > 0)}
+            {chip(C.agents, `${running} agent`, running > 0)}
+          </Box>
         </Box>
         {sessionsBlock}
         {queueBlock}
