@@ -1227,8 +1227,16 @@ export const register: Register = on => {
         {turnBlock}
         {agentsBlock}
         {logBlock}
+        {e.props.isFocused ? null : (
+          <Box width={W}>
+            <Text color={C.faint} wrap="truncate">
+              <Text color={C.dim} bold>ctrl+x</Text> rồi <Text color={C.dim} bold>tab</Text> để vào glancedeck, rồi{' '}
+              <Text color={C.dim} bold>↑↓</Text> để di chuyển
+            </Text>
+          </Box>
+        )}
         <Box width={W}>
-          <Text color={C.faint}>tab chuyển · </Text>
+          <Text color={C.faint}>↑↓ di chuyển · </Text>
           <Button key="f-queue" plain hotkey="q" onPress={() => setView($, x => ({ ...x, editing: 'new', focusBlock: 'queue' }))}>
             thêm queue
           </Button>
