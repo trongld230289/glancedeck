@@ -1,0 +1,6 @@
+{
+  "name": "glancedeck",
+  "description": "glancedeck: a Claude Code pane with a prompt queue, other sessions across accounts, subagents and the session log",
+  "owner": { "name": "trongld230289" },
+  "plugins": [{ "name": "glancedeck", "source": "./" }]
+}
