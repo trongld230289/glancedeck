@@ -134,8 +134,18 @@ async function sharedDir($: EngineInterface): Promise<string | null> {
   return home ? `${home.replace(/\\/g, '/')}/.glancedeck` : null
 }
 
+const firstCwd = new Map<string, string>()
+
+/** The folder the session started in: a `cd` mid-session moves $.session.cwd() but must not rename or re-key the session. */
+async function projectCwd($: EngineInterface): Promise<string | null> {
+  const [id, cwd] = await Promise.all([$.session.id().catch(() => ''), $.session.cwd().catch(() => null)])
+  if (!cwd) return firstCwd.get(id) ?? null
+  if (!firstCwd.has(id)) firstCwd.set(id, cwd)
+  return firstCwd.get(id) ?? cwd
+}
+
 async function queueKey($: EngineInterface): Promise<string | null> {
-  const cwd = await $.session.cwd().catch(() => null)
+  const cwd = await projectCwd($)
   return cwd ? projectKey(cwd) : null
 }
 
@@ -188,7 +198,7 @@ async function tick($: EngineInterface, isGone = false) {
   if (!dir || !key) return
   const [id, cwd, configDir, rt0, own, cards, now] = await Promise.all([
     $.session.id(),
-    $.session.cwd(),
+    projectCwd($).then(c => c ?? ''),
     $.env.get('CLAUDE_CONFIG_DIR'),
     read($, runtime),
     read($, log),
@@ -694,7 +704,7 @@ export const register: Register = on => {
       read($, self),
       read($, turn),
       $.session.id().catch(() => ''),
-      $.session.cwd().catch(() => '?'),
+      projectCwd($).then(c => c ?? '?'),
       $.clock.now(),
     ])
     const beats = beats0 ?? []
@@ -1241,8 +1251,8 @@ export const register: Register = on => {
         <Box width={W} marginBottom={1}>
           <Box flexGrow={1} flexShrink={1}>
             <Text wrap="truncate">
-              {/* A wordmark, not a slab: ● is drawn by the terminal font itself (◈ came from a fallback font and spilled over the next cell). */}
-              <Text color={C.queue}>{'● '}</Text>
+              {/* ♦ is in Consolas, so the terminal draws it in one cell; ◈ came from a fallback font and spilled over the next cell. */}
+              <Text color={C.queue}>{'♦ '}</Text>
               <Text bold color={C.text}>glance</Text>
               <Text bold color={C.queue}>deck</Text>
             </Text>
