@@ -1113,6 +1113,10 @@ export const register: Register = on => {
     const model = prettyModel(t.model)
     const isTurnLive = t.startedAt !== null && t.endedAt === null
     const isTurnOk = t.errors === 0 && (t.reason === null || t.reason === 'answer')
+    // The live row names what the turn is on: its latest tool call, or "thinking" before the first one.
+    const turnStart = t.startedAt
+    const latest = isTurnLive ? [...lines].reverse().find(l => l.who === 'main' && turnStart !== null && l.at >= turnStart) : undefined
+    const doing = shorten(latest?.text ?? 'thinking…', Math.max(10, inner - 26))
     const stats = (
       <Text color={C.dim}>
         <Text color={t.edits > 0 ? C.text : C.dim}>{`${t.edits} edits`}</Text>
@@ -1139,10 +1143,10 @@ export const register: Register = on => {
         row(
           't-now',
           hasClient ? (
-            <els.Client key="t-spin-label" module="./spin.tsx" props={{ color: C.ember, label: 'working', bold: true, now }} />
+            <els.Client key="t-spin-label" module="./spin.tsx" props={{ color: C.ember, label: doing, bold: true, now }} />
           ) : (
             <Text color={C.ember} bold>
-              ● working
+              {`● ${doing}`}
             </Text>
           ),
           hasClient ? (
@@ -1162,7 +1166,7 @@ export const register: Register = on => {
             {`${isTurnOk ? '✓' : '✗'} last turn · ${fmtElapsed((t.endedAt ?? now) - t.startedAt)}`}
             {t.reason && t.reason !== 'answer' ? ` · stopped (${t.reason})` : ''}
           </Text>,
-          <Text color={C.faint}>{`xong ${fmtClock(t.endedAt ?? now)}`}</Text>,
+          <Text color={C.faint}>{`ended ${fmtClock(t.endedAt ?? now)}`}</Text>,
         )
       ),
     ])

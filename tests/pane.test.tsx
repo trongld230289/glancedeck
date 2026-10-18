@@ -123,6 +123,7 @@ test('the TURN block runs while the main turn does, then becomes a receipt', asy
   expect(await ui.find({ text: '1 edits' })).toBeDefined()
   expect(await ui.find({ text: '1 errors' })).toBeDefined()
   expect(await ui.find({ text: /last turn/ })).toBeUndefined()
+  expect(await ui.find({ text: /npm test/ })).toBeDefined()
   await ui.unmount()
 
   await clock.advance(79_000)
