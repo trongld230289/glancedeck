@@ -1002,7 +1002,7 @@ export const register: Register = on => {
         'AGENTS',
         C.agents,
         <Text color={C.dim}>{totalAgents === 0 ? ' · chưa có' : ` · ${running} running · ${totalAgents} total`}</Text>,
-        shown.length > 0 ? <Text color={C.faint}>{`1-${shown.length} mở`}</Text> : null,
+        shown.length > 0 ? <Text color={C.faint}>{shown.length === 1 ? 'phím 1: xem việc' : `phím 1-${shown.length}: xem việc`}</Text> : null,
       ),
       ...(isOpen('agents')
         ? shown.flatMap((c, j) => {
@@ -1016,9 +1016,8 @@ export const register: Register = on => {
                   hotkey={String(j + 1)}
                   onPress={() => setView($, x => ({ ...x, expandedAgent: x.expandedAgent === i ? null : i }))}
                 >
-                  <Text color={C.agents} bold>{`${j + 1} `}</Text>
                   <Text color={c.status === 'running' ? C.text : C.dim}>{c.name}</Text>
-                  <Text color={C.faint}>{`  ${kTokens(c.ctx)}/${kTokens(c.out)}`}</Text>
+                  <Text color={C.faint}>{`  ${kTokens(c.ctx + c.out)} token`}</Text>
                 </Button>,
                 clock(c),
               ),
@@ -1043,7 +1042,7 @@ export const register: Register = on => {
               <Text wrap="truncate">
                 <Text color={C.agents}>◇ </Text>
                 <Text color={a.status === 'running' ? C.text : C.dim}>{a.name}</Text>
-                <Text color={C.faint}>{`  ${kTokens(a.ctx)}/${kTokens(a.out)} · `}</Text>
+                <Text color={C.faint}>{`  ${kTokens(a.ctx + a.out)} token · `}</Text>
                 <Text color={C.dim}>{a.project}</Text>
                 {a.account ? <Text color={C.rose}>{` @${a.account}`}</Text> : null}
               </Text>,
