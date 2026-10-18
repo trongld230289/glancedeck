@@ -548,6 +548,7 @@ export const register: Register = on => {
         status: 'running',
         tools: [],
         answer: '',
+        model: started.model,
       }
       await setAgents($, list => [...list, card].slice(-AGENTS_MAX))
       if (!e.parentAgentId) await setTurn($, t => (t.endedAt === null && t.startedAt !== null ? { ...t, agents: t.agents + 1 } : t))
@@ -1088,7 +1089,10 @@ export const register: Register = on => {
                   hotkey={String(j + 1)}
                   onPress={() => setView($, x => ({ ...x, expandedAgent: x.expandedAgent === i ? null : i }))}
                 >
-                  <Text color={c.status === 'running' ? C.text : C.dim} wrap="truncate">{c.name}</Text>
+                  <Text wrap="truncate">
+                    <Text color={c.status === 'running' ? C.text : C.dim}>{c.name}</Text>
+                    {c.model ? <Text color={C.faint}>{` · ${prettyModel(c.model)}`}</Text> : null}
+                  </Text>
                 </Button>,
                 clock(c),
               ),
@@ -1114,6 +1118,7 @@ export const register: Register = on => {
               <Text wrap="truncate">
                 <Text color={C.agents}>◇ </Text>
                 <Text color={a.status === 'running' ? C.text : C.dim}>{a.name}</Text>
+                {a.model ? <Text color={C.faint}>{` · ${prettyModel(a.model)}`}</Text> : null}
                 <Text color={C.faint}>{`  ${kTokens(a.ctx + a.out)} token · `}</Text>
                 <Text color={C.dim}>{a.project}</Text>
                 {a.account ? <Text color={C.rose}>{` @${a.account}`}</Text> : null}

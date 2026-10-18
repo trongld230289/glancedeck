@@ -34,6 +34,8 @@ export type AgentCard = {
   status: 'running' | 'done' | 'failed'
   tools: string[]
   answer: string
+  /** What the subagent runs on (resolved id or alias); absent on cards from before 0.2.14. */
+  model?: string
 }
 
 /** One row of the session log. `path` is set on an edit, so the row can open the file. */
@@ -124,7 +126,7 @@ export type Heartbeat = {
 }
 
 /** A subagent as the other sessions see it in a heartbeat. */
-export type SharedAgent = Pick<AgentCard, 'name' | 'ctx' | 'out' | 'spawnedAt' | 'endedAt' | 'status'>
+export type SharedAgent = Pick<AgentCard, 'name' | 'ctx' | 'out' | 'spawnedAt' | 'endedAt' | 'status' | 'model'>
 
 declare module 'claude-code' {
   interface PluginState {

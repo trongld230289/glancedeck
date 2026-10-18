@@ -118,7 +118,7 @@ export const sharedAgents = (cards: readonly AgentCard[], now: number): SharedAg
   cards
     .filter(c => c.status === 'running' || (c.endedAt !== null && now - c.endedAt < AGENT_LINGER_MS))
     .slice(-9)
-    .map(({ name, ctx, out, spawnedAt, endedAt, status }) => ({ name, ctx, out, spawnedAt, endedAt, status }))
+    .map(({ name, ctx, out, spawnedAt, endedAt, status, model }) => ({ name, ctx, out, spawnedAt, endedAt, status, ...(model ? { model } : {}) }))
 
 /** The other live sessions' subagents, each tagged with where it runs; running ones first. */
 export const peerAgents = (beats: readonly Heartbeat[], selfId: string, now: number) =>

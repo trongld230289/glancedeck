@@ -118,3 +118,8 @@ test('heartbeats and questions are read leniently', () => {
   expect(questionOf({ questions: [{ question: 'Public or private?' }] })).toBe('Public or private?')
   expect(questionOf({})).toBe('asking you')
 })
+
+test('a shared subagent carries the model it runs on', () => {
+  const card: AgentCard = { id: 'a', name: 'Scan', ctx: 0, out: 0, spawnedAt: NOW, endedAt: null, status: 'running', tools: [], answer: '', model: 'claude-haiku-5-5' }
+  expect(sharedAgents([card], NOW)[0]?.model).toBe('claude-haiku-5-5')
+})
