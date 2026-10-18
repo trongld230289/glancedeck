@@ -99,20 +99,3 @@ export const prettyModel = (id: string) => {
   if (m?.[1] && m[2]) return `${m[1].charAt(0).toUpperCase()}${m[1].slice(1).toLowerCase()} ${m[2]}${m[3] ? `.${m[3]}` : ''}`
   return shorten(id, 18)
 }
-
-/**
- * A swimlane on one time axis from t0 to t1: the cells [from, to) the span start..end covers,
- * at least one cell so a short agent still shows.
- */
-export const laneSpan = (t0: number, t1: number, start: number, end: number, width: number) => {
-  const span = Math.max(1, t1 - t0)
-  const at = (t: number) => Math.round(((Math.min(Math.max(t, t0), t1) - t0) / span) * width)
-  const from = Math.min(width - 1, at(start))
-  return { from, to: Math.max(from + 1, at(end)) }
-}
-
-/** The lane as text, for surfaces that cannot run a client module. */
-export const laneText = (t0: number, t1: number, start: number, end: number, width: number) => {
-  const { from, to } = laneSpan(t0, t1, start, end, width)
-  return { before: '·'.repeat(from), bar: '━'.repeat(to - from), after: '·'.repeat(Math.max(0, width - to)) }
-}

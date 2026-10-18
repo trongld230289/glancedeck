@@ -13,7 +13,6 @@ import {
   fmtUntil,
   isLogged,
   kTokens,
-  laneText,
   noteTool,
   pathOf,
   prettyModel,
@@ -969,7 +968,7 @@ export const register: Register = on => {
               row(
                 's-self',
                 <Text wrap="truncate" color={C.dim}>
-                  {` ${MARK[s.status].icon}  ${s.project} (đây)`}
+                  {` ${MARK[s.status].icon}  ${s.project}`}
                   {s.account ? ` @${s.account}` : ''}
                 </Text>,
                 <Text color={C.faint}>{s.elapsed ? `${s.activity} · ${s.elapsed}` : s.activity}</Text>,
@@ -1027,29 +1026,6 @@ export const register: Register = on => {
       ) : (
         <Text color={C.ember}>{`● ${fmtElapsed(now - c.spawnedAt)}`}</Text>
       )
-    // Swimlanes: every card of this session on one time axis, from the first spawn to now (or the last end).
-    const LANE_W = Math.max(8, Math.min(20, inner - 34))
-    const t0 = Math.min(...shown.map(c => c.spawnedAt), now)
-    const t1 = shown.some(c => c.status === 'running') ? null : Math.max(t0 + 1, ...shown.map(c => c.endedAt ?? now))
-    const lane = (c: AgentCard, j: number) => {
-      const color = c.status === 'failed' ? C.alarm : c.status === 'running' ? C.ember : C.agents
-      if (hasClient)
-        return (
-          <els.Client
-            key={`a-lane-${c.id}`}
-            module="./lane.tsx"
-            props={{ t0, t1, start: c.spawnedAt, end: c.endedAt, now, width: LANE_W, color, dim: C.faint }}
-          />
-        )
-      const x = laneText(t0, t1 ?? now, c.spawnedAt, c.endedAt ?? now, LANE_W)
-      return (
-        <Text key={`a-lane-${j}`}>
-          <Text color={C.faint}>{x.before}</Text>
-          <Text color={color}>{x.bar}</Text>
-          <Text color={C.faint}>{x.after}</Text>
-        </Text>
-      )
-    }
     const agentsBlock = frame('agents', C.agents, running > 0, [
       headRow(
         'agents',
@@ -1072,11 +1048,7 @@ export const register: Register = on => {
                 >
                   <Text color={c.status === 'running' ? C.text : C.dim} wrap="truncate">{c.name}</Text>
                 </Button>,
-                <Box>
-                  {lane(c, j)}
-                  <Text> </Text>
-                  {clock(c)}
-                </Box>,
+                clock(c),
               ),
               ...(v.expandedAgent === i && expanded
                 ? [
@@ -1105,7 +1077,11 @@ export const register: Register = on => {
                 {a.account ? <Text color={C.rose}>{` @${a.account}`}</Text> : null}
               </Text>,
               a.status === 'running' ? (
-                <Text color={C.ember}>{`● ${fmtElapsed(now - a.spawnedAt)}`}</Text>
+                hasClient ? (
+                  <els.Client key={`a-peer-clock-${k}`} module="./spin.tsx" props={{ since: a.spawnedAt, now, color: C.ember }} />
+                ) : (
+                  <Text color={C.ember}>{`● ${fmtElapsed(now - a.spawnedAt)}`}</Text>
+                )
               ) : (
                 <Text color={a.status === 'done' ? C.jade : C.alarm}>
                   {`${a.status === 'done' ? '✓' : '✗'} ${fmtElapsed((a.endedAt ?? now) - a.spawnedAt)}`}
@@ -1145,12 +1121,12 @@ export const register: Register = on => {
       ) : isTurnLive ? (
         row(
           't-now',
+          <Text color={C.text}>đang làm</Text>,
           hasClient ? (
-            <els.Client key="t-spin" module="./spin.tsx" props={{ color: C.ember, label: 'đang làm ·', since: t.startedAt, now, bold: true }} />
+            <els.Client key="t-spin" module="./spin.tsx" props={{ color: C.ember, since: t.startedAt, now }} />
           ) : (
-            <Text color={C.ember} bold>{`● đang làm · ${fmtElapsed(now - t.startedAt)}`}</Text>
+            <Text color={C.ember}>{`● ${fmtElapsed(now - t.startedAt)}`}</Text>
           ),
-          null,
         )
       ) : (
         row(
@@ -1162,9 +1138,6 @@ export const register: Register = on => {
           <Text color={C.faint}>{`xong ${fmtClock(t.endedAt ?? now)}`}</Text>,
         )
       ),
-      ...(isTurnLive && hasClient
-        ? [<els.Client key="t-rail" module="./rail.tsx" props={{ width: inner, color: C.ember, dim: C.faint }} />]
-        : []),
     ])
 
     // ---- SESSION LOG: a timeline, one glyph per source
