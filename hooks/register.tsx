@@ -1151,12 +1151,6 @@ export const register: Register = on => {
               <Text color={s.status === 'waiting' ? C.sessions : C.dim} bold={s.status === 'waiting'}>
                 {s.elapsed ? `${s.activity} · ${s.elapsed}` : s.activity}
               </Text>,
-              undefined,
-              hoverCard(C.sessions, [
-                cardLine('c-who', C.text, `${s.project}${s.account ? ` @${s.account}` : ''}`),
-                cardLine('c-state', MARK[s.status].color, `${s.status === 'done' ? 'idle' : s.status}${s.elapsed ? ` · ${s.elapsed}` : ''}`),
-                cardLine('c-what', C.dim, s.activity || 'no activity yet'),
-              ]),
             ),
           )
         : []),
