@@ -293,9 +293,15 @@ async function tick($: EngineInterface, isGone = false) {
   ])
   const rt = { ...IDLE, ...rt0 }
   const lines = own ?? []
-  const kind: Heartbeat['status'] = rt.isAsking ? 'waiting' : rt.isTurnRunning || rt.background.length > 0 ? 'working' : 'idle'
+  const shells = rt.shells ?? []
+  const kind: Heartbeat['status'] = rt.isAsking
+    ? 'waiting'
+    : rt.isTurnRunning || rt.background.length > 0 || shells.length > 0
+      ? 'working'
+      : 'idle'
   if (kind !== status.kind) status = { kind, since: now }
   const last = [...lines].reverse().find(l => l.who === 'main' || l.who === 'agent')
+  const isOnlyShells = !rt.isTurnRunning && rt.background.length === 0 && shells.length > 0
   const beat: Heartbeat = {
     sessionId: id,
     project: basename(cwd),
@@ -303,7 +309,12 @@ async function tick($: EngineInterface, isGone = false) {
     queueKey: key,
     account: accountOf(configDir),
     status: kind,
-    activity: kind === 'waiting' ? (rt.question ?? 'waiting for you') : (last?.text ?? ''),
+    activity:
+      kind === 'waiting'
+        ? (rt.question ?? 'waiting for you')
+        : isOnlyShells
+          ? `${plural(shells.length, 'shell')} running · ${shells[0]}`
+          : (last?.text ?? ''),
     since: status.since,
     startedAt,
     updatedAt: isGone ? 0 : now,
@@ -740,6 +751,16 @@ export const register: Register = on => {
       await maybeStart($)
     })
 
+    return done
+  })
+
+  // The main turn's end lists the background work still in flight: shells and the like keep the session working.
+  on('classic.Stop', async ($, e, next) => {
+    const done = await next(e)
+    await quietly($, 'background tasks', async () => {
+      const shells = (e.background_tasks ?? []).filter(t => t.type !== 'subagent').map(t => shorten(t.description || t.command || t.type, 40))
+      await setRuntime($, r => ({ ...r, shells }))
+    })
     return done
   })
 

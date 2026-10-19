@@ -80,6 +80,8 @@ export type Runtime = {
   isTurnRunning: boolean
   /** Background subagents of this session still running. */
   background: string[]
+  /** Other background work still running when the main turn last ended (shells, monitors, workflows), by description. */
+  shells?: string[]
   isAsking: boolean
   /** Failed tool calls in the current (or last) main turn. */
   turnErrors: number

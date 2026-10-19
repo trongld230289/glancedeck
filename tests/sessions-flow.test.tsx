@@ -126,3 +126,41 @@ test('other sessions show up across accounts; one waiting 3 minutes alerts once;
   const mine = [...files.entries()].find(([p]) => /queues\/glanceline-/.test(p))
   expect(JSON.parse(mine?.[1].text ?? '{}').items).toEqual([])
 })
+
+test('a background shell keeps the session working after the turn ends; the next turn end with none frees it', async ($, on) => {
+  const clock = mock.clock(on, { now: START })
+  mock.env(on, { USERPROFILE: 'C:\\Users\\t', OS: 'Windows_NT', CLAUDE_CONFIG_DIR: 'C:\\Users\\t\\.claude' })
+  const files = new Map<string, { text: string; at: number }>()
+  on('session.id', () => ({ value: 'self' }))
+  on('session.cwd', () => ({ value: 'D:/Project/glanceline' }))
+  on('session.start', () => ({ cwd: 'D:/Project/glanceline' }))
+  on('command.register', () => ({ value: undefined }) as never)
+  on('ui.open', () => ({ value: { isPlaced: true } }) as never)
+  on('fs.read', (_, e) => {
+    const f = files.get(norm(e.path))
+    return f ? { value: f.text } : { deny: 'missing' }
+  })
+  on('fs.write', (_, e) => {
+    files.set(norm(e.path), { text: e.text, at: clock.now() })
+    return { value: undefined }
+  })
+  on('fs.exists', (_, e) => ({ value: files.has(norm(e.path)) }) as never)
+  on('fs.list', () => ({ value: [] }) as never)
+  on('classic.Stop', () => ({}) as never)
+  const beat = () => JSON.parse(files.get('C:/Users/t/.glancedeck/sessions/self.json')?.text ?? '{}')
+
+  await $.session.start({ cwd: 'D:/Project/glanceline', surface: 'terminal', isInteractive: true } as never)
+  await $.classic.Stop({
+    stop_hook_active: false,
+    background_tasks: [
+      { id: 'b1', type: 'shell', status: 'running', description: 'npm run dev', command: 'npm run dev' },
+      { id: 'a1', type: 'subagent', status: 'running', description: 'Review flow' },
+    ],
+  } as never)
+  await clock.advance(5000)
+  expect(beat()).toMatchObject({ status: 'working', activity: '1 shell running · npm run dev' })
+
+  await $.classic.Stop({ stop_hook_active: false, background_tasks: [] } as never)
+  await clock.advance(5000)
+  expect(beat()).toMatchObject({ status: 'idle' })
+})
