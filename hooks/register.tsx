@@ -1043,12 +1043,15 @@ export const register: Register = on => {
       ...(isOpen('sessions') && messageTarget
         ? [
             <Box key="s-msg" width={inner}>
-              <Text color={C.sessions}>{`→ ${messageTarget.project}${messageTarget.account ? ` @${messageTarget.account}` : ''}: `}</Text>
+              {/* The label keeps its width; a long placeholder used to squeeze it onto two lines. */}
+              <Box flexShrink={0}>
+                <Text color={C.sessions}>{`→ ${shorten(messageTarget.project, 20)}${messageTarget.account ? ` @${messageTarget.account}` : ''}: `}</Text>
+              </Box>
               {Input ? (
                 <Input
                   key="s-msg-input"
                   label=""
-                  placeholder="message as if from you, sent when that session is idle…"
+                  placeholder="sent as you when it is idle…"
                   autoFocus
                   onSubmit={(text: string) => {
                     void setView($, x => ({ ...x, messageTo: null }))
