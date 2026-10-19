@@ -163,4 +163,14 @@ test('a background shell keeps the session working after the turn ends; the next
   await $.classic.Stop({ stop_hook_active: false, background_tasks: [] } as never)
   await clock.advance(5000)
   expect(beat()).toMatchObject({ status: 'idle' })
+
+  // A watch only waits: an artifact's comment watch or a monitor leaves the session idle.
+  await $.classic.Stop({
+    stop_hook_active: false,
+    background_tasks: [
+      { id: 'w1', type: 'monitor', status: 'running', description: 'live updates for artifact https://claude.ai/artifact/x' },
+    ],
+  } as never)
+  await clock.advance(5000)
+  expect(beat()).toMatchObject({ status: 'idle' })
 })

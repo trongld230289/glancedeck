@@ -129,6 +129,8 @@ const CALLS_MAX = 200
 const RUN_TOOLS = new Set(['Bash', 'PowerShell'])
 const AGENT_TOOLS = new Set(['Agent', 'Task'])
 const LOOK_TOOLS = new Set(['Read', 'Grep', 'Glob', 'LS', 'WebFetch', 'WebSearch'])
+// Background tasks that are work being done, as opposed to a watch waiting for an event.
+const WORK_TASKS = new Set(['shell', 'workflow'])
 const callKind = (tool: string, isError: boolean) =>
   isError ? 'x' : EDIT_TOOLS.has(tool) ? 'e' : RUN_TOOLS.has(tool) ? 'r' : AGENT_TOOLS.has(tool) ? 'a' : LOOK_TOOLS.has(tool) ? 's' : 'o'
 
@@ -754,11 +756,12 @@ export const register: Register = on => {
     return done
   })
 
-  // The main turn's end lists the background work still in flight: shells and the like keep the session working.
+  // The main turn's end lists the background work still in flight: shells and workflows keep the session working.
+  // Watchers (a monitor, an artifact's comment watch) only wait for something to happen, so they do not.
   on('classic.Stop', async ($, e, next) => {
     const done = await next(e)
     await quietly($, 'background tasks', async () => {
-      const shells = (e.background_tasks ?? []).filter(t => t.type !== 'subagent').map(t => shorten(t.description || t.command || t.type, 40))
+      const shells = (e.background_tasks ?? []).filter(t => WORK_TASKS.has(t.type)).map(t => shorten(t.description || t.command || t.type, 40))
       await setRuntime($, r => ({ ...r, shells }))
     })
     return done
