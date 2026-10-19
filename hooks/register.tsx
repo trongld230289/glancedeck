@@ -1255,8 +1255,9 @@ export const register: Register = on => {
     const peers = peerAgents(beats, selfId, now)
     const running = cards.filter(c => c.status === 'running').length + peers.filter(a => a.status === 'running').length
     const totalAgents = cards.length + peers.length
-    const shown = cards.slice(-9)
-    const offset = cards.length - shown.length
+    // The newest agents, newest on top: key 1 is the one spawned last.
+    const shown = cards.slice(-9).reverse()
+    const indexOf = (j: number) => cards.length - 1 - j
     const expanded = v.expandedAgent !== null ? cards[v.expandedAgent] : undefined
     // A light sweeps the names of the first few running agents; more would cost the drawing thread for little.
     const glowing = new Set(shown.filter(c => c.status === 'running').slice(0, 4).map(c => c.id))
@@ -1290,7 +1291,7 @@ export const register: Register = on => {
       ),
       ...(isOpen('agents')
         ? shown.flatMap((c, j) => {
-            const i = offset + j
+            const i = indexOf(j)
             return [
               row(
                 `a-${j}`,
@@ -1453,7 +1454,8 @@ export const register: Register = on => {
       peer: { icon: '!', color: C.rose },
       queue: { icon: '»', color: C.queue },
     }
-    const logLines = (v.logTab === 'all' ? mergeLogs(lines, beats, selfId, now) : lines.filter(l => l.who !== 'peer')).slice(-12)
+    // The newest 12 lines, newest on top.
+    const logLines = (v.logTab === 'all' ? mergeLogs(lines, beats, selfId, now) : lines.filter(l => l.who !== 'peer')).slice(-12).reverse()
     const logRow = (l: LogLine, i: number) => {
       const mark = LOG_MARK[l.who]
       const body = (

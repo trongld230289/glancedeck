@@ -54,7 +54,9 @@ test('tool calls land in the log, an edit row opens its file, a failed call is m
   expect(await ui.find({ text: /Bash → python install\.py --token=•••  ×/ })).toBeDefined()
   expect(await ui.find({ text: /TodoWrite/ })).toBeUndefined()
 
-  await ui.press({ key: 'l-0' })
+  // Newest on top: the Bash line is first, the Edit line (with a path to open) second.
+  expect(await ui.find({ key: 'l-1' })).toBeDefined()
+  await ui.press({ key: 'l-1' })
   expect(ran.at(-1)?.slice(-2)).toEqual(['-g', 'D:/Project/glanceline/install.py'])
   await ui.unmount()
 })

@@ -5,8 +5,8 @@ A Claude Code mod: one pane beside the transcript with four blocks.
 - **QUEUE**: prompts for this project, sent one at a time when Claude is free, as your own words.
 - **SESSIONS**: every other Claude Code session on this machine, across all accounts (`CLAUDE_CONFIG_DIR`). Whoever waits on you sits on top in yellow.
 - **TURN**: the main model's turn as it runs (spinner, clock, edits, errors, agents), then a receipt for it.
-- **AGENTS**: subagents with a spinner and clock while running; a number key opens one's tokens, tools and answer.
-- **SESSION LOG**: prompts, edits, commands and questions; `all` merges the other sessions' logs.
+- **AGENTS**: the newest subagents, newest on top, with a spinner and clock while running; a number key opens one's tokens, tools and answer.
+- **SESSION LOG**: prompts, edits, commands and questions, newest on top; `all` merges the other sessions' logs.
 
 Tested on Claude Code **2.1.302** (Windows 11). Mods are early access: the API can change between releases.
 
