@@ -1,5 +1,5 @@
 // Pure helpers: no `$`, so the tests can call them directly.
-import type { AgentCard, LogLine } from '../types'
+import type { AgentCard, LogLine, TaskItem } from '../types'
 
 export const LOG_MAX = 200
 export const AGENTS_MAX = 24
@@ -56,7 +56,45 @@ export const applyStep = (
   return { ...c, ctx: ctx > 0 ? ctx : c.ctx, out: c.out + (x.output_tokens ?? 0) }
 }
 
-export const noteTool = (c: AgentCard, text: string): AgentCard => ({ ...c, tools: [...c.tools, text].slice(-3) })
+// ---- the main session's task list: TodoWrite sends it whole, TaskCreate/TaskUpdate one task at a time
+const TASK_STATUSES = new Set(['pending', 'in_progress', 'completed'])
+const isDone = (t: TaskItem) => t.status === 'completed'
+
+/** A TodoWrite call's `todos`, as the list; anything malformed is skipped. */
+export const tasksFromTodos = (todos: unknown): TaskItem[] =>
+  (Array.isArray(todos) ? todos : []).flatMap((x, i) => {
+    if (!isObject(x) || typeof x.content !== 'string' || !TASK_STATUSES.has(x.status as string)) return []
+    const active = typeof x.activeForm === 'string' && x.activeForm ? { active: x.activeForm } : {}
+    return [{ id: String(i), title: x.content, status: x.status as TaskItem['status'], ...active }]
+  })
+
+/** A created task joins the list; once every task of the old list is done, a new list starts. */
+export const addTask = (list: readonly TaskItem[], id: string, title: string, active?: string): TaskItem[] => [
+  ...(list.length > 0 && list.every(isDone) ? [] : list),
+  { id, title, status: 'pending', ...(active ? { active } : {}) },
+]
+
+/** A TaskUpdate: a new status or subject; `deleted` drops the task. */
+export const changeTask = (list: readonly TaskItem[], id: string, status: unknown, subject: unknown): TaskItem[] =>
+  status === 'deleted'
+    ? list.filter(t => t.id !== id)
+    : list.map(t =>
+        t.id !== id
+          ? t
+          : {
+              ...t,
+              ...(TASK_STATUSES.has(status as string) ? { status: status as TaskItem['status'] } : {}),
+              ...(typeof subject === 'string' && subject ? { title: subject } : {}),
+            },
+      )
+
+/** Done of total, and what runs now (its spinner text, else its title). */
+export const progressOf = (list: readonly TaskItem[]) => {
+  const now = list.find(t => t.status === 'in_progress')
+  return { done: list.filter(isDone).length, total: list.length, current: now ? now.active || now.title : null }
+}
+
+export const noteTool =(c: AgentCard, text: string): AgentCard => ({ ...c, tools: [...c.tools, text].slice(-3) })
 
 export const pushLog = (log: readonly LogLine[], line: LogLine): LogLine[] => [...log, line].slice(-LOG_MAX)
 

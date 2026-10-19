@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { applyStep, describeCall, imageContext, fmtElapsed, imageNumbers, sessionDirName, kTokens, prettyModel, promptText, pushLog, LOG_MAX } from '../hooks/core'
+import { addTask, applyStep, changeTask, describeCall, progressOf, tasksFromTodos, imageContext, fmtElapsed, imageNumbers, sessionDirName, kTokens, prettyModel, promptText, pushLog, LOG_MAX } from '../hooks/core'
 import type { AgentCard } from '../types'
 
 const card: AgentCard = { id: 'a', name: 'x', ctx: 0, out: 0, spawnedAt: 0, endedAt: null, status: 'running', tools: [], answer: '' }
@@ -49,4 +49,24 @@ test('model ids read as names', () => {
   expect(prettyModel('claude-opus-5-5')).toBe('Opus 5.5')
   expect(prettyModel('claude-haiku-5-5-20260101')).toBe('Haiku 5.5')
   expect(prettyModel('')).toBe('Claude')
+})
+
+test('the task list: TodoWrite whole, TaskCreate/TaskUpdate one at a time, a new list once the old is done', () => {
+  const todos = tasksFromTodos([
+    { content: 'Plan', status: 'completed', activeForm: 'Planning' },
+    { content: 'Build', status: 'in_progress', activeForm: 'Building' },
+    { content: 'Ship', status: 'pending', activeForm: 'Shipping' },
+    { content: 7, status: 'pending' },
+  ])
+  expect(progressOf(todos)).toEqual({ done: 1, total: 3, current: 'Building' })
+  expect(tasksFromTodos(undefined)).toEqual([])
+
+  let list = addTask(addTask([], '1', 'Task one'), '2', 'Task two')
+  list = changeTask(list, '1', 'in_progress', undefined)
+  expect(progressOf(list)).toEqual({ done: 0, total: 2, current: 'Task one' })
+  list = changeTask(changeTask(list, '1', 'completed', undefined), '2', 'completed', 'Task 2')
+  expect(progressOf(list)).toEqual({ done: 2, total: 2, current: null })
+  expect(list[1]?.title).toBe('Task 2')
+  expect(changeTask(list, '2', 'deleted', undefined).map(t => t.id)).toEqual(['1'])
+  expect(addTask(list, '3', 'Next plan').map(t => t.id)).toEqual(['3'])
 })
