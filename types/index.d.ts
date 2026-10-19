@@ -112,15 +112,6 @@ export type Turn = {
   reason: string | null
 }
 
-/** One task of the main session's list, from TodoWrite (id is its place) or TaskCreate (id is the task's). */
-export type TaskItem = {
-  id: string
-  title: string
-  status: 'pending' | 'in_progress' | 'completed'
-  /** What the spinner says while it runs ("Running tests"); TodoWrite's activeForm. */
-  active?: string
-}
-
 /** What each session writes to the shared folder every few seconds. */
 export type Heartbeat = {
   sessionId: string
@@ -154,7 +145,6 @@ declare module 'claude-code' {
       others: Heartbeat[]
       self: Heartbeat | null
       turn: Turn
-      tasks: TaskItem[]
     }
   }
 }

@@ -1,13 +1,11 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, Timer } from 'claude-code'
 
-import type { AgentCard, Block, Heartbeat, LogLine, QueueFile, QueueItem, Runtime, SessionRow, TaskItem, Turn, View } from '../types'
+import type { AgentCard, Block, Heartbeat, LogLine, QueueFile, QueueItem, Runtime, SessionRow, Turn, View } from '../types'
 import {
   AGENTS_MAX,
   EDIT_TOOLS,
-  addTask,
   applyStep,
-  changeTask,
   basename,
   describeCall,
   imageContext,
@@ -21,12 +19,10 @@ import {
   noteTool,
   pathOf,
   prettyModel,
-  progressOf,
   promptText,
   pushLog,
   sessionDirName,
   shorten,
-  tasksFromTodos,
 } from './core'
 import {
   EMPTY_QUEUE,
@@ -127,9 +123,6 @@ const self = atom({ plugin: 'glancedeck', key: 'self' } as const, null as Heartb
 const NO_TURN: Turn = { startedAt: null, endedAt: null, model: '', edits: 0, errors: 0, agents: 0, calls: '', reason: null }
 const turn = atom({ plugin: 'glancedeck', key: 'turn' } as const, NO_TURN)
 const setTurn = ($: EngineInterface, change: (t: Turn) => Turn) => update($, turn, t => change({ ...NO_TURN, ...t }))
-const tasks = atom({ plugin: 'glancedeck', key: 'tasks' } as const, [] as TaskItem[])
-const setTasks = ($: EngineInterface, change: (l: TaskItem[]) => TaskItem[]) => update($, tasks, l => change(l ?? []))
-const TASK_TOOLS = new Set(['TodoWrite', 'TaskCreate', 'TaskUpdate'])
 
 // The TURN strip: one cell per main tool call, its color the kind of work.
 const CALLS_MAX = 200
@@ -556,7 +549,6 @@ export const register: Register = on => {
       await update($, agents, () => [])
       await update($, log, () => [])
       await update($, turn, () => NO_TURN)
-      await update($, tasks, () => [])
       await setView($, v => ({ ...v, expandedAgent: null }))
     }
 
@@ -707,19 +699,6 @@ export const register: Register = on => {
       if (isQuestion) void quietly($, 'asking off', () => setRuntime($, r => ({ ...r, isAsking: false, question: null })))
     })
     if (ran.deny !== undefined) return ran
-    // The main session's task list feeds the TASKS bar; a subagent's own todos are its business.
-    if (TASK_TOOLS.has(e.tool) && !e.agentId && ran.isError !== true) {
-      await quietly($, 'tasks', async () => {
-        const i = e as unknown as Record<string, unknown>
-        if (e.tool === 'TodoWrite') await setTasks($, () => tasksFromTodos(i.todos))
-        else if (e.tool === 'TaskCreate') {
-          const task = (ran.result as { task?: { id?: unknown; subject?: unknown } } | undefined)?.task
-          const title = typeof task?.subject === 'string' ? task.subject : typeof i.subject === 'string' ? i.subject : ''
-          const active = typeof i.activeForm === 'string' ? i.activeForm : undefined
-          if (task?.id !== undefined) await setTasks($, l => addTask(l, String(task.id), title, active))
-        } else if (typeof i.taskId === 'string') await setTasks($, l => changeTask(l, i.taskId as string, i.status, i.subject))
-      })
-    }
     await quietly($, 'tool.call log', async () => {
       const isError = ran.isError === true
       const id = e.agentId
@@ -842,7 +821,7 @@ export const register: Register = on => {
     const Input = 'Input' in els ? els.Input : null
     const hasClient = 'Client' in els
     const C = await paletteOf($, e.surface)
-    const [v0, cards0, lines0, q0, rt0, beats0, selfBeat, turn0, tasks0, selfId, cwd, now] = await Promise.all([
+    const [v0, cards0, lines0, q0, rt0, beats0, selfBeat, turn0, selfId, cwd, now] = await Promise.all([
       read($, view),
       read($, agents),
       read($, log),
@@ -851,7 +830,6 @@ export const register: Register = on => {
       read($, others),
       read($, self),
       read($, turn),
-      read($, tasks),
       $.session.id().catch(() => ''),
       projectCwd($).then(c => c ?? '?'),
       $.clock.now(),
@@ -1467,45 +1445,6 @@ export const register: Register = on => {
       ...(t.startedAt !== null && calls.length > 0 ? [callStrip] : []),
     ])
 
-    // ---- TASKS: the main session's task list as a bar; it stays while any task is open or the turn that
-    // finished them still runs, and goes once the last task is done and the turn has ended.
-    const taskList = tasks0 ?? []
-    const progress = progressOf(taskList)
-    const hasOpenTasks = progress.done < progress.total
-    const tasksBlock =
-      progress.total > 0 && (hasOpenTasks || isTurnLive)
-        ? (() => {
-            const pct = `${Math.round((progress.done / progress.total) * 100)}%`
-            const barCols = Math.max(4, inner - pct.length - 1)
-            const lit = Math.round((progress.done / progress.total) * barCols)
-            return frame('tasks', C.jade, hasOpenTasks, [
-              row(
-                'tk-head',
-                <Text wrap="truncate">
-                  <Text color={C.jade} bold>
-                    TASKS
-                  </Text>
-                  <Text color={C.dim}>{` · ${progress.done}/${progress.total}`}</Text>
-                </Text>,
-                hasOpenTasks ? null : <Text color={C.jade}>• all done</Text>,
-              ),
-              row(
-                'tk-bar',
-                <Text>
-                  <Text color={C.jade}>{'▰'.repeat(lit)}</Text>
-                  <Text color={C.faint}>{'▱'.repeat(barCols - lit)}</Text>
-                </Text>,
-                <Text color={hasOpenTasks ? C.text : C.jade} bold>
-                  {pct}
-                </Text>,
-              ),
-              ...(progress.current
-                ? [row('tk-now', <Text color={C.text} wrap="truncate">{`▸ ${progress.current}`}</Text>, null)]
-                : []),
-            ])
-          })()
-        : null
-
     // ---- SESSION LOG: a timeline, one glyph per source
     const LOG_MARK: Record<LogLine['who'], { icon: string; color: string }> = {
       you: { icon: '▸', color: C.text },
@@ -1604,7 +1543,6 @@ export const register: Register = on => {
         </Box>
         {/* A terminal's borders already part the blocks; elsewhere they touched, so give them air. */}
         <Box flexDirection="column" gap={e.surface === 'terminal' ? 0 : 1}>
-          {tasksBlock}
           {sessionsBlock}
           {queueBlock}
           {turnBlock}
