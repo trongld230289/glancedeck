@@ -86,10 +86,8 @@ test('other sessions show up across accounts; one waiting 3 minutes alerts once;
   await clock.advance(5000)
 
   let pane = await $.ui.mount({ plugin: 'glancedeck', surface: 'terminal', ...PANE })
-  // A row that can be messaged draws its mark as plain text inside its Button, so no Client sits in front of the name.
-  expect(await pane.find({ key: 's-pulse-0' })).toBeUndefined()
-  expect(await pane.find({ key: 's-spin-1' })).toBeUndefined()
-  expect(await pane.find({ text: / ! acme-api / })).toBeDefined()
+  expect(await pane.find({ text: /! acme-api/, in: 's-pulse-0' })).toBeDefined()
+  expect(await pane.find({ key: 's-spin-1' })).toBeDefined()
   expect(await pane.find({ text: '@acc2' })).toBeDefined()
   expect(await pane.find({ text: /Bash → npm run build/ })).toBeDefined()
   expect(await pane.find({ text: /1 waiting/, in: 'h-waiting' })).toBeDefined()

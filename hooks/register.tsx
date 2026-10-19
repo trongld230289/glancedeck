@@ -67,6 +67,7 @@ const DARK = {
   ink: '#000000',
   emberLit: '#FFD9C2',
   agentsLit: '#D6DDFF',
+  rowHover: '#2A3040',
   // The wordmark's "deck" rolls through these while anything works.
   ramp: ['#5EE6E6', '#3BB0B3', '#167A80'],
 }
@@ -90,6 +91,7 @@ const THEMED: Palette = {
   ink: 'inverseText',
   emberLit: 'text',
   agentsLit: 'text',
+  rowHover: 'subtle',
   ramp: ['planMode', 'suggestion', 'ide'],
 }
 const paletteOf = async ($: EngineInterface, surface: string): Promise<Palette> => {
@@ -1142,12 +1144,9 @@ export const register: Register = on => {
         : []),
       ...(isOpen('sessions') && !picking
         ? sessions.map((s, i) => {
-            // A Client beside the Button took the pointer over the name's first letters, so a row that can
-            // be messaged draws its mark as plain Text inside the Button: the whole row is one target.
-            const isAnimated = hasClient && !canMessage(s)
             const mark =
               s.status === 'waiting' ? (
-                isAnimated ? (
+                hasClient ? (
                   <Box key={`s-mark-${i}`} flexShrink={0}>
                     <els.Client
                       key={`s-pulse-${i}`}
@@ -1158,7 +1157,7 @@ export const register: Register = on => {
                 ) : (
                   <Text key={`s-mark-${i}`} backgroundColor={C.sessions} color={C.ink} bold>{` ! ${s.project} `}</Text>
                 )
-              ) : s.status === 'working' && isAnimated ? (
+              ) : s.status === 'working' && hasClient ? (
                 <Box key={`s-mark-${i}`} flexShrink={0}>
                   <Text> </Text>
                   <els.Client key={`s-spin-${i}`} module="./spin.tsx" props={{ color: C.ember, now }} />
@@ -1180,10 +1179,11 @@ export const register: Register = on => {
               const gap = ' '.repeat(Math.max(1, room - nm.length - act.length))
               const project = s.status === 'waiting' ? '' : nm.slice(0, s.project.length + 1)
               return (
-                <Box key={`s-${i}`} width={inner}>
-                  {isAnimated ? mark : null}
+                // The row's keyed Box is a hover scope: the pointer anywhere on the line, the mark included,
+                // lights the whole line, not only where the Button's own region starts.
+                <Box key={`s-${i}`} width={inner} hover={{ backgroundColor: C.rowHover }}>
+                  {mark}
                   <Button key={`s-row-${i}`} plain onPress={() => messageSession(s)}>
-                    {isAnimated ? null : mark}
                     <Text color={C.text}>{project}</Text>
                     <Text color={C.rose}>{nm.slice(project.length)}</Text>
                     {gap}
