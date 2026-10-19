@@ -19,7 +19,7 @@ test('the pane draws the four blocks at 58 columns', async ($, on) => {
   const ui = await $.ui.mount({ plugin: 'glancedeck', surface: 'terminal', ...PANE })
 
   expect(await ui.find({ text: /glanceline/ })).toBeUndefined()
-  expect(await ui.find({ text: /♦ glancedeck/ })).toBeDefined()
+  expect(await ui.find({ text: 'glance', in: 'wordmark' })).toBeDefined()
   for (const title of ['QUEUE', 'SESSIONS', 'AGENTS', 'SESSION LOG']) {
     expect(await ui.find({ text: title })).toBeDefined()
   }
@@ -50,7 +50,7 @@ test('tool calls land in the log, an edit row opens its file, a failed call is m
 
   const ui = await $.ui.mount({ plugin: 'glancedeck', surface: 'terminal', ...PANE })
   expect(await ui.find({ text: /Edit → glanceline\/install\.py/ })).toBeDefined()
-  expect(await ui.find({ text: /Bash → python install\.py --token=•••  ✗/ })).toBeDefined()
+  expect(await ui.find({ text: /Bash → python install\.py --token=•••  ×/ })).toBeDefined()
   expect(await ui.find({ text: /TodoWrite/ })).toBeUndefined()
 
   await ui.press({ key: 'l-0' })
@@ -84,7 +84,7 @@ test('a subagent gets a card, its tools, and a done mark with its answer', async
   } as never)
   ui = await $.ui.mount({ plugin: 'glancedeck', surface: 'terminal', ...PANE })
   expect(await ui.find({ text: /0 running · 1 total/ })).toBeDefined()
-  expect(await ui.find({ text: '✓ 2:38' })).toBeDefined()
+  expect(await ui.find({ text: '√ 2:38' })).toBeDefined()
 
   await ui.press({ key: 'a-0' })
   expect(await ui.find({ text: /Read → src\/flow\.ts/ })).toBeDefined()
@@ -120,15 +120,18 @@ test('the TURN block runs while the main turn does, then becomes a receipt', asy
   await $.tool.call({ tool: 'Bash', tool_use_id: 'b1', command: 'npm test' } as never)
   ui = await $.ui.mount({ plugin: 'glancedeck', surface: 'terminal', ...PANE })
   expect(await ui.find({ text: 'TURN' })).toBeDefined()
-  expect(await ui.find({ text: '1 edits' })).toBeDefined()
-  expect(await ui.find({ text: '1 errors' })).toBeDefined()
+  expect(await ui.find({ text: '1 edit' })).toBeDefined()
+  expect(await ui.find({ text: '1 error' })).toBeDefined()
   expect(await ui.find({ text: /last turn/ })).toBeUndefined()
   expect(await ui.find({ text: /npm test/ })).toBeDefined()
+  // The strip: one cell per call, an edit then a failed run.
+  expect(await ui.find({ text: '2 calls' })).toBeDefined()
+  expect(await ui.find({ key: 't-strip' })).toBeDefined()
   await ui.unmount()
 
   await clock.advance(79_000)
   await $.turn.complete({ reason: 'answer', answer: '', durationMs: 1, isAborted: false, turnId: 't1' } as never)
   ui = await $.ui.mount({ plugin: 'glancedeck', surface: 'terminal', ...PANE })
-  expect(await ui.find({ text: /✗ last turn · 1:19/ })).toBeDefined()
+  expect(await ui.find({ text: /× last turn · 1:19/ })).toBeDefined()
   await ui.unmount()
 })

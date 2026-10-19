@@ -41,6 +41,8 @@ import { accountOf, dueAlerts, isLive, isQueueOwner, mergeLogs, parseHeartbeat, 
 const PANE = 'glancedeck'
 const PANE_COLUMNS = 58
 const COUNTDOWN_MS = 5000
+// A waiting session's chip beats this long, then holds still so it never nags.
+const PULSE_MS = 30_000
 
 // Hue names a block; inside a block, color only says state: lantern waits on you, ember works, jade is done.
 const C = {
@@ -58,7 +60,12 @@ const C = {
   rose: '#F39BD0',
   alarm: '#FF7A7A',
   ink: '#000000',
+  card: '#161A22',
+  emberLit: '#FFD9C2',
+  agentsLit: '#D6DDFF',
 }
+// The wordmark's "deck" rolls through these while anything works.
+const DECK_RAMP = ['#5EE6E6', '#3BB0B3', '#167A80']
 
 const DEFAULT_VIEW: View = {
   collapsed: [],
@@ -77,11 +84,22 @@ const queue = atom({ plugin: 'glancedeck', key: 'queue' } as const, EMPTY_QUEUE)
 const runtime = atom({ plugin: 'glancedeck', key: 'runtime' } as const, IDLE)
 const others = atom({ plugin: 'glancedeck', key: 'others' } as const, [] as Heartbeat[])
 const self = atom({ plugin: 'glancedeck', key: 'self' } as const, null as Heartbeat | null)
-const NO_TURN: Turn = { startedAt: null, endedAt: null, model: '', edits: 0, errors: 0, agents: 0, reason: null }
+const NO_TURN: Turn = { startedAt: null, endedAt: null, model: '', edits: 0, errors: 0, agents: 0, calls: '', reason: null }
 const turn = atom({ plugin: 'glancedeck', key: 'turn' } as const, NO_TURN)
 const setTurn = ($: EngineInterface, change: (t: Turn) => Turn) => update($, turn, t => change({ ...NO_TURN, ...t }))
 
-const BLOCK_OF_KEY: Record<string, Block> = { q: 'queue', s: 'sessions', a: 'agents', l: 'log' }
+// The TURN strip: one cell per main tool call, its color the kind of work.
+const CALLS_MAX = 200
+const RUN_TOOLS = new Set(['Bash', 'PowerShell'])
+const AGENT_TOOLS = new Set(['Agent', 'Task'])
+const LOOK_TOOLS = new Set(['Read', 'Grep', 'Glob', 'LS', 'WebFetch', 'WebSearch'])
+const callKind = (tool: string, isError: boolean) =>
+  isError ? 'x' : EDIT_TOOLS.has(tool) ? 'e' : RUN_TOOLS.has(tool) ? 'r' : AGENT_TOOLS.has(tool) ? 'a' : LOOK_TOOLS.has(tool) ? 's' : 'o'
+
+/** `1 edit`, `2 edits`. */
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
+
+const BLOCK_OF_KEY: Record<string, Block> ={ q: 'queue', s: 'sessions', a: 'agents', l: 'log' }
 
 const setView = ($: EngineInterface, change: (v: View) => View) => update($, view, v => change({ ...DEFAULT_VIEW, ...v }))
 const setAgents = ($: EngineInterface, change: (a: AgentCard[]) => AgentCard[]) => update($, agents, a => change(a ?? []))
@@ -593,6 +611,7 @@ export const register: Register = on => {
       if (isError && !id) await setRuntime($, r => ({ ...r, turnErrors: r.turnErrors + 1 }))
       if (isError && !id) await setTurn($, t => ({ ...t, errors: t.errors + 1 }))
       if (!isError && EDIT_TOOLS.has(e.tool)) await setTurn($, t => ({ ...t, edits: t.edits + 1 }))
+      if (!id) await setTurn($, t => (t.endedAt === null && t.startedAt !== null ? { ...t, calls: `${t.calls ?? ''}${callKind(e.tool, isError)}`.slice(-CALLS_MAX) } : t))
       if (!isLogged(e.tool)) return
       const text = describeCall(e.tool, e)
       if (id) await setAgents($, list => list.map(c => (c.id === id ? noteTool(c, text) : c)))
@@ -600,7 +619,7 @@ export const register: Register = on => {
       await say($, {
         who: id ? 'agent' : 'main',
         label: id ? await agentLabel($, id) : 'main',
-        text: isError ? `${text}  ✗` : text,
+        text: isError ? `${text}  ×` : text,
         ...(path ? { path } : {}),
         ...(isError ? { isError } : {}),
       })
@@ -670,7 +689,7 @@ export const register: Register = on => {
     return (
       <Box>
         <Text color={isHeld ? C.alarm : C.queue} bold>
-          {isHeld ? '✗ held ' : '⏳ sending soon '}
+          {isHeld ? '× held ' : '► sending soon '}
         </Text>
         <Text color={C.text} wrap="truncate">
           {shorten(head.text, Math.max(10, e.props.bodyColumns - 34))}
@@ -723,7 +742,7 @@ export const register: Register = on => {
     const fold = (b: Block) => () => setView($, x => ({ ...x, collapsed: toggle(x.collapsed, b) }))
 
     // A row: what it is on the left, cut to fit; a fixed part on the right.
-    const row = (key: string, left: JSX.Element, right: JSX.Element | null, bg?: string) => (
+    const row = (key: string, left: JSX.Element, right: JSX.Element | null, bg?: string, card?: JSX.Element | null) => (
       <Box key={key} width={inner} backgroundColor={bg}>
         <Box flexGrow={1} flexShrink={1}>
           {left}
@@ -733,7 +752,33 @@ export const register: Register = on => {
             {right}
           </Box>
         ) : null}
+        {card ?? null}
       </Box>
+    )
+
+    // A card the pointer reveals over the rows above its row; it takes no room, so nothing below it moves.
+    // No key of its own: a keyed card would be its own hover scope, and the row's pointer would never reach it.
+    const hoverCard = (color: string, lines: JSX.Element[]) => (
+      <Box
+        position="absolute"
+        top={-(lines.length + 2)}
+        left={2}
+        width={Math.max(20, inner - 4)}
+        flexDirection="column"
+        borderStyle="round"
+        borderColor={color}
+        backgroundColor={C.card}
+        paddingX={1}
+        display="none"
+        hover={{ display: 'flex' }}
+      >
+        {lines}
+      </Box>
+    )
+    const cardLine = (key: string, color: string, text: string) => (
+      <Text key={key} color={color} wrap="truncate">
+        {text}
+      </Text>
     )
 
     const headRow = (block: Block, title: string, color: string, summary: JSX.Element, right: JSX.Element | null) =>
@@ -771,10 +816,10 @@ export const register: Register = on => {
     const autoColor = q.paused ? (q.pauseReason === 'if-ok' ? C.alarm : C.dim) : usageHold ? C.sessions : C.jade
     const itemRight = (item: QueueItem, i: number) =>
       item.isBlocked ? (
-        <Text color={C.alarm}>✗ error</Text>
+        <Text color={C.alarm}>× error</Text>
       ) : i === 0 ? (
         q.paused ? (
-          <Text color={C.dim}>⏸ paused</Text>
+          <Text color={C.dim}>○ paused</Text>
         ) : (
           <Text color={C.queue} bold>
             next
@@ -837,7 +882,7 @@ export const register: Register = on => {
         <Button key={`q-item-${item.id}`} plain onPress={() => setView($, x => ({ ...x, selected: item.id }))}>
           <Text color={isHead ? C.queue : C.faint} bold={isHead}>{`${mark} `}</Text>
           <Text color={isHead ? C.text : C.dim} bold={isHead}>
-            {counting && isHead ? `${item.text} · sau ${Math.max(0, Math.ceil((counting.endsAt - now) / 1000))}s` : item.text}
+            {counting && isHead ? `${item.text} · in ${Math.max(0, Math.ceil((counting.endsAt - now) / 1000))}s` : item.text}
           </Text>
         </Button>,
         itemRight(item, i),
@@ -872,7 +917,7 @@ export const register: Register = on => {
             ...(q.items.length === 0 && v.editing !== 'new'
               ? [row('q-empty', <Text color={C.faint}>/q &lt;task&gt; or q to add. Sent when Claude is idle.</Text>, null)]
               : []),
-            ...(sentToday > 0 ? [row('q-sent', <Text color={C.faint}>{`✓ sent today: ${sentToday}`}</Text>, null)] : []),
+            ...(sentToday > 0 ? [row('q-sent', <Text color={C.faint}>{`√ sent today: ${sentToday}`}</Text>, null)] : []),
             ...(isQueueFocused && q.items.length > 0
               ? [
                   <Box key="q-keys" width={inner}>
@@ -934,7 +979,7 @@ export const register: Register = on => {
     const MARK: Record<SessionRow['status'], { icon: string; color: string }> = {
       waiting: { icon: '!', color: C.sessions },
       working: { icon: '●', color: C.ember },
-      done: { icon: '✓', color: C.jade },
+      done: { icon: '√', color: C.jade },
     }
     const sessionsBlock = frame('sessions', C.sessions, waiting > 0, [
       headRow(
@@ -1023,10 +1068,20 @@ export const register: Register = on => {
             row(
               `s-${i}`,
               s.status === 'waiting' ? (
-                <Text wrap="truncate">
-                  <Text backgroundColor={C.sessions} color={C.ink} bold>{` ! ${s.project} `}</Text>
-                  {s.account ? <Text color={C.rose}>{` @${s.account}`}</Text> : null}
-                </Text>
+                <Box>
+                  {hasClient ? (
+                    <Box flexShrink={0}>
+                      <els.Client
+                        key={`s-pulse-${i}`}
+                        module="./pulse.tsx"
+                        props={{ text: ` ! ${s.project} `, fg: C.ink, a: C.sessions, b: C.ember, bold: true, stopAfterMs: PULSE_MS }}
+                      />
+                    </Box>
+                  ) : (
+                    <Text backgroundColor={C.sessions} color={C.ink} bold>{` ! ${s.project} `}</Text>
+                  )}
+                  <Text wrap="truncate">{s.account ? <Text color={C.rose}>{` @${s.account}`}</Text> : null}</Text>
+                </Box>
               ) : (
                 <Box>
                   {s.status === 'working' && hasClient ? (
@@ -1047,6 +1102,12 @@ export const register: Register = on => {
               <Text color={s.status === 'waiting' ? C.sessions : C.dim} bold={s.status === 'waiting'}>
                 {s.elapsed ? `${s.activity} · ${s.elapsed}` : s.activity}
               </Text>,
+              undefined,
+              hoverCard(C.sessions, [
+                cardLine('c-who', C.text, `${s.project}${s.account ? ` @${s.account}` : ''}`),
+                cardLine('c-state', MARK[s.status].color, `${s.status === 'done' ? 'idle' : s.status}${s.elapsed ? ` · ${s.elapsed}` : ''}`),
+                cardLine('c-what', C.dim, s.activity || 'no activity yet'),
+              ]),
             ),
           )
         : []),
@@ -1059,11 +1120,13 @@ export const register: Register = on => {
     const shown = cards.slice(-9)
     const offset = cards.length - shown.length
     const expanded = v.expandedAgent !== null ? cards[v.expandedAgent] : undefined
+    // A light sweeps the names of the first few running agents; more would cost the drawing thread for little.
+    const glowing = new Set(shown.filter(c => c.status === 'running').slice(0, 4).map(c => c.id))
     const clock = (c: AgentCard) =>
       c.status !== 'running' ? (
         <Text
           color={c.status === 'done' ? C.jade : C.alarm}
-        >{`${c.status === 'done' ? '✓' : '✗'} ${fmtElapsed((c.endedAt ?? now) - c.spawnedAt)}`}</Text>
+        >{`${c.status === 'done' ? '√' : '×'} ${fmtElapsed((c.endedAt ?? now) - c.spawnedAt)}`}</Text>
       ) : hasClient ? (
         <els.Client key={`a-clock-${c.id}`} module="./spin.tsx" props={{ since: c.spawnedAt, now, color: C.ember }} />
       ) : (
@@ -1093,17 +1156,32 @@ export const register: Register = on => {
             return [
               row(
                 `a-${j}`,
-                <Button
-                  key={`a-${j}`}
-                  plain
-                  hotkey={String(j + 1)}
-                  onPress={() => setView($, x => ({ ...x, expandedAgent: x.expandedAgent === i ? null : i }))}
-                >
-                  <Text wrap="truncate">
-                    <Text color={c.status === 'running' ? C.text : C.dim}>{c.name}</Text>
-                  </Text>
-                </Button>,
+                // A Button holds only text, so it carries the agent's key; the name beside it may sweep.
+                <Box>
+                  <Button
+                    key={`a-${j}`}
+                    plain
+                    hotkey={String(j + 1)}
+                    onPress={() => setView($, x => ({ ...x, expandedAgent: x.expandedAgent === i ? null : i }))}
+                  >
+                    <Text color={v.expandedAgent === i ? C.agents : C.faint}>{`${j + 1} `}</Text>
+                  </Button>
+                  {hasClient && glowing.has(c.id) ? (
+                    <els.Client key={`a-glow-${c.id}`} module="./spin.tsx" props={{ color: C.text, lit: C.agentsLit, label: c.name, noFrame: true, now }} />
+                  ) : (
+                    <Text wrap="truncate" color={c.status === 'running' ? C.text : C.dim}>
+                      {c.name}
+                    </Text>
+                  )}
+                </Box>,
                 withModel(c.model, clock(c)),
+                undefined,
+                hoverCard(C.agents, [
+                  cardLine('c-name', C.text, c.name),
+                  cardLine('c-tok', C.faint, `${kTokens(c.ctx)} context · ${kTokens(c.out)} output${c.model ? ` · ${prettyModel(c.model)}` : ''}`),
+                  ...(c.tools.length === 0 ? [cardLine('c-none', C.faint, 'no tool calls yet')] : c.tools.slice(-3).map((t, k) => cardLine(`c-t${k}`, C.dim, `· ${t}`))),
+                  ...(c.answer ? [cardLine('c-ans', C.dim, `» ${c.answer}`)] : []),
+                ]),
               ),
               ...(v.expandedAgent === i && expanded
                 ? [
@@ -1125,9 +1203,9 @@ export const register: Register = on => {
             row(
               `a-peer-${k}`,
               <Text wrap="truncate">
-                <Text color={C.agents}>◇ </Text>
+                <Text color={C.agents}>◊ </Text>
                 <Text color={a.status === 'running' ? C.text : C.dim}>{a.name}</Text>
-                <Text color={C.faint}>{`  ${kTokens(a.ctx + a.out)} token · `}</Text>
+                <Text color={C.faint}>{`  ${kTokens(a.ctx + a.out)} tokens · `}</Text>
                 <Text color={C.dim}>{a.project}</Text>
                 {a.account ? <Text color={C.rose}>{` @${a.account}`}</Text> : null}
               </Text>,
@@ -1139,9 +1217,15 @@ export const register: Register = on => {
                 )
               ) : (
                 <Text color={a.status === 'done' ? C.jade : C.alarm}>
-                  {`${a.status === 'done' ? '✓' : '✗'} ${fmtElapsed((a.endedAt ?? now) - a.spawnedAt)}`}
+                  {`${a.status === 'done' ? '√' : '×'} ${fmtElapsed((a.endedAt ?? now) - a.spawnedAt)}`}
                 </Text>
               )),
+              undefined,
+              hoverCard(C.agents, [
+                cardLine('c-name', C.text, a.name),
+                cardLine('c-where', C.dim, `${a.project}${a.account ? ` @${a.account}` : ''}${a.model ? ` · ${prettyModel(a.model)}` : ''}`),
+                cardLine('c-tok', C.faint, `${kTokens(a.ctx)} context · ${kTokens(a.out)} output`),
+              ]),
             ),
           )
         : []),
@@ -1154,15 +1238,50 @@ export const register: Register = on => {
     // The live row names what the turn is on: its latest tool call, or "thinking" before the first one.
     const turnStart = t.startedAt
     const latest = isTurnLive ? [...lines].reverse().find(l => l.who === 'main' && turnStart !== null && l.at >= turnStart) : undefined
-    const doing = shorten(latest?.text ?? 'thinking…', Math.max(10, inner - 26))
+    // Room for the label: the row less the spinner and its space, and the clock on the right with a cell of growth.
+    const clockCols = fmtElapsed(now - (turnStart ?? now)).length + 2
+    const doing = shorten(latest?.text ?? 'thinking…', Math.max(10, inner - 2 - clockCols))
     const stats = (
       <Text color={C.dim}>
-        <Text color={t.edits > 0 ? C.text : C.dim}>{`${t.edits} edits`}</Text>
+        <Text color={t.edits > 0 ? C.text : C.dim}>{plural(t.edits, 'edit')}</Text>
         {' · '}
-        <Text color={t.errors > 0 ? C.alarm : C.dim}>{`${t.errors} errors`}</Text>
+        <Text color={t.errors > 0 ? C.alarm : C.dim}>{plural(t.errors, 'error')}</Text>
         {' · '}
-        <Text color={t.agents > 0 ? C.agents : C.dim}>{`${t.agents} agent`}</Text>
+        <Text color={t.agents > 0 ? C.agents : C.dim}>{plural(t.agents, 'agent')}</Text>
       </Text>
+    )
+    // One cell per tool call, newest on the right, colored by the kind of work; the pointer on it shows the key.
+    const CALL_COLOR: Record<string, string> = { e: C.jade, r: C.ember, a: C.agents, s: C.log, o: C.faint, x: C.alarm }
+    const calls = t.calls ?? ''
+    const callsLabel = plural(calls.length, 'call')
+    const cells = calls.slice(-Math.max(4, inner - callsLabel.length - 1))
+    const runs: { kind: string; n: number }[] = []
+    for (const k of cells) {
+      const last = runs[runs.length - 1]
+      if (last && last.kind === k) last.n += 1
+      else runs.push({ kind: k, n: 1 })
+    }
+    const callStrip = row(
+      't-strip',
+      <Text wrap="truncate">
+        {runs.map((r, k) => (
+          <Text key={`t-run-${k}`} color={CALL_COLOR[r.kind] ?? C.faint}>
+            {'█'.repeat(r.n)}
+          </Text>
+        ))}
+      </Text>,
+      <Text color={C.faint}>{callsLabel}</Text>,
+      undefined,
+      hoverCard(C.ember, [
+        <Text key="c-key" wrap="truncate">
+          <Text color={C.jade}>█ edit </Text>
+          <Text color={C.ember}>█ run </Text>
+          <Text color={C.agents}>█ agent </Text>
+          <Text color={C.log}>█ read </Text>
+          <Text color={C.faint}>█ other </Text>
+          <Text color={C.alarm}>█ failed</Text>
+        </Text>,
+      ]),
     )
     const turnBlock = frame('turn', C.ember, isTurnLive, [
       row(
@@ -1181,7 +1300,7 @@ export const register: Register = on => {
         row(
           't-now',
           hasClient ? (
-            <els.Client key="t-spin-label" module="./spin.tsx" props={{ color: C.ember, label: doing, bold: true, now }} />
+            <els.Client key="t-spin-label" module="./spin.tsx" props={{ color: C.ember, lit: C.emberLit, label: doing, bold: true, now }} />
           ) : (
             <Text color={C.ember} bold>
               {`● ${doing}`}
@@ -1201,19 +1320,20 @@ export const register: Register = on => {
         row(
           't-last',
           <Text color={isTurnOk ? C.jade : C.alarm}>
-            {`${isTurnOk ? '✓' : '✗'} last turn · ${fmtElapsed((t.endedAt ?? now) - t.startedAt)}`}
+            {`${isTurnOk ? '√' : '×'} last turn · ${fmtElapsed((t.endedAt ?? now) - t.startedAt)}`}
             {t.reason && t.reason !== 'answer' ? ` · stopped (${t.reason})` : ''}
           </Text>,
           <Text color={C.faint}>{`ended ${fmtClock(t.endedAt ?? now)}`}</Text>,
         )
       ),
+      ...(t.startedAt !== null && calls.length > 0 ? [callStrip] : []),
     ])
 
     // ---- SESSION LOG: a timeline, one glyph per source
     const LOG_MARK: Record<LogLine['who'], { icon: string; color: string }> = {
       you: { icon: '▸', color: C.text },
       main: { icon: '●', color: C.ember },
-      agent: { icon: '◇', color: C.agents },
+      agent: { icon: '◊', color: C.agents },
       peer: { icon: '!', color: C.rose },
       queue: { icon: '»', color: C.queue },
     }
@@ -1254,7 +1374,7 @@ export const register: Register = on => {
       row(
         'l-head',
         <Button key="l-head" plain onPress={fold('log')}>
-          <Text color={C.text} bold>{`${isOpen('log') ? '' : '▸ '}SESSION LOG`}</Text>
+          <Text color={C.log} bold>{`${isOpen('log') ? '' : '▸ '}SESSION LOG`}</Text>
           {logLines.length === 0 ? <Text color={C.dim}> · none yet</Text> : null}
         </Button>,
         <Box>
@@ -1277,17 +1397,32 @@ export const register: Register = on => {
       <Box flexDirection="column" width={W + 2} paddingX={1}>
         <Box width={W} marginBottom={1}>
           <Box flexGrow={1} flexShrink={1}>
-            <Text wrap="truncate">
-              {/* ♦ is in Consolas, so the terminal draws it in one cell; ◈ came from a fallback font and spilled over the next cell. */}
-              <Text color={C.queue}>{'♦ '}</Text>
-              <Text bold color={C.text}>glance</Text>
-              <Text bold color={C.queue}>deck</Text>
-            </Text>
+            {hasClient ? (
+              <els.Client key="wordmark" module="./wordmark.tsx" props={{ isBusy: isTurnLive || running > 0, text: C.text, ramp: DECK_RAMP }} />
+            ) : (
+              <Text wrap="truncate">
+                {/* ♦ is in Consolas, so the terminal draws it in one cell; ◈ came from a fallback font and spilled over the next cell. */}
+                <Text color={C.queue}>{'♦ '}</Text>
+                <Text bold color={C.text}>glance</Text>
+                <Text bold color={C.queue}>deck</Text>
+              </Text>
+            )}
           </Box>
           <Box flexShrink={0}>
-            {chip(C.sessions, `${waiting} waiting`, waiting > 0)}
+            {waiting > 0 && hasClient ? (
+              <Box>
+                <Text>{'  '}</Text>
+                <els.Client
+                  key="h-waiting"
+                  module="./pulse.tsx"
+                  props={{ text: ` ${waiting} waiting `, fg: C.ink, a: C.sessions, b: C.ember, bold: true, stopAfterMs: PULSE_MS }}
+                />
+              </Box>
+            ) : (
+              chip(C.sessions, `${waiting} waiting`, waiting > 0)
+            )}
             {chip(C.queue, `${q.items.length} queued`, q.items.length > 0)}
-            {chip(C.agents, `${running} agent`, running > 0)}
+            {chip(C.agents, plural(running, 'agent'), running > 0)}
           </Box>
         </Box>
         {sessionsBlock}
@@ -1304,7 +1439,8 @@ export const register: Register = on => {
           </Box>
         )}
         <Box width={W}>
-          <Text color={C.faint}>↑↓ move · </Text>
+          {/* Unfocused, the line above already says how to move. */}
+          {e.props.isFocused ? <Text color={C.faint}>↑↓ move · </Text> : null}
           <Button key="f-queue" plain hotkey="q" onPress={async () => {
               await setView($, x => ({ ...x, editing: 'new', focusBlock: 'queue' }))
               await focusInput($, 'q-new')

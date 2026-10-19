@@ -102,6 +102,8 @@ export type Turn = {
   edits: number
   errors: number
   agents: number
+  /** One letter per tool call this turn, oldest first: e edit, r run, a agent, s read or search, o other, x failed. */
+  calls?: string
   /** Why the last turn ended (`answer` when it finished normally); null while it runs. */
   reason: string | null
 }

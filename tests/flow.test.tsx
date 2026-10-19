@@ -124,7 +124,7 @@ test('--if-ok after a turn with a failed tool call is held, the queue pauses and
   expect(stored.pauseReason).toBe('if-ok')
 
   const pane = await $.ui.mount({ plugin: 'glancedeck', surface: 'terminal', ...PANE })
-  expect(await pane.find({ text: /✗ error/ })).toBeDefined()
+  expect(await pane.find({ text: /× error/ })).toBeDefined()
   await pane.unmount()
 })
 

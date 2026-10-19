@@ -86,10 +86,10 @@ test('other sessions show up across accounts; one waiting 3 minutes alerts once;
   await clock.advance(5000)
 
   let pane = await $.ui.mount({ plugin: 'glancedeck', surface: 'terminal', ...PANE })
-  expect(await pane.find({ text: /! acme-api/ })).toBeDefined()
+  expect(await pane.find({ text: /! acme-api/, in: 's-pulse-0' })).toBeDefined()
   expect(await pane.find({ text: '@acc2' })).toBeDefined()
   expect(await pane.find({ text: /Bash → npm run build/ })).toBeDefined()
-  expect(await pane.find({ text: /1 waiting/ })).toBeDefined()
+  expect(await pane.find({ text: /1 waiting/, in: 'h-waiting' })).toBeDefined()
   await pane.press({ key: 'l-tab-all' })
   expect(await pane.find({ text: /acme-api asks/ })).toBeDefined()
   await pane.unmount()
