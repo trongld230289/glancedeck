@@ -1143,9 +1143,12 @@ export const register: Register = on => {
         : []),
       ...(isOpen('sessions') && !picking
         ? sessions.map((s, i) => {
+            // Off the terminal a Client beside the Button took the pointer over the name's first letters,
+            // so there the mark is plain Text inside the Button and the whole row is one target.
+            const isAnimated = hasClient && e.surface === 'terminal'
             const mark =
               s.status === 'waiting' ? (
-                hasClient ? (
+                isAnimated ? (
                   <Box key={`s-mark-${i}`} flexShrink={0}>
                     <els.Client
                       key={`s-pulse-${i}`}
@@ -1156,7 +1159,7 @@ export const register: Register = on => {
                 ) : (
                   <Text key={`s-mark-${i}`} backgroundColor={C.sessions} color={C.ink} bold>{` ! ${s.project} `}</Text>
                 )
-              ) : s.status === 'working' && hasClient ? (
+              ) : s.status === 'working' && isAnimated ? (
                 <Box key={`s-mark-${i}`} flexShrink={0}>
                   <Text> </Text>
                   <els.Client key={`s-spin-${i}`} module="./spin.tsx" props={{ color: C.ember, now }} />
@@ -1179,8 +1182,9 @@ export const register: Register = on => {
               const project = s.status === 'waiting' ? '' : nm.slice(0, s.project.length + 1)
               return (
                 <Box key={`s-${i}`} width={inner}>
-                  {mark}
+                  {isAnimated ? mark : null}
                   <Button key={`s-row-${i}`} plain onPress={() => messageSession(s)}>
+                    {isAnimated ? null : mark}
                     <Text color={C.text}>{project}</Text>
                     <Text color={C.rose}>{nm.slice(project.length)}</Text>
                     {gap}

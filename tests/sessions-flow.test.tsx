@@ -87,6 +87,7 @@ test('other sessions show up across accounts; one waiting 3 minutes alerts once;
 
   let pane = await $.ui.mount({ plugin: 'glancedeck', surface: 'terminal', ...PANE })
   expect(await pane.find({ text: /! acme-api/, in: 's-pulse-0' })).toBeDefined()
+  expect(await pane.find({ key: 's-spin-1' })).toBeDefined()
   expect(await pane.find({ text: '@acc2' })).toBeDefined()
   expect(await pane.find({ text: /Bash → npm run build/ })).toBeDefined()
   expect(await pane.find({ text: /1 waiting/, in: 'h-waiting' })).toBeDefined()
@@ -99,6 +100,13 @@ test('other sessions show up across accounts; one waiting 3 minutes alerts once;
   expect(await pane.find({ text: /→ acme-web: / })).toBeUndefined()
   await pane.press({ key: 's-row-0' })
   expect(await pane.find({ text: /→ acme-api @acc2: / })).toBeDefined()
+  await pane.unmount()
+
+  // Off the terminal the mark is plain text inside the row's Button, so no Client sits in front of the name.
+  pane = await $.ui.mount({ plugin: 'glancedeck', surface: 'desktop', ...PANE })
+  expect(await pane.find({ key: 's-pulse-0' })).toBeUndefined()
+  expect(await pane.find({ key: 's-spin-1' })).toBeUndefined()
+  expect(await pane.find({ text: / ! acme-api / })).toBeDefined()
   await pane.unmount()
 
   // This session's own heartbeat is in the shared folder for the others.
