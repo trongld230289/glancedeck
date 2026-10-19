@@ -1178,6 +1178,21 @@ export const register: Register = on => {
               const nm = name.length > room - act.length - 1 ? shorten(name, Math.max(1, room - act.length - 1)) : name
               const gap = ' '.repeat(Math.max(1, room - nm.length - act.length))
               const project = s.status === 'waiting' ? '' : nm.slice(0, s.project.length + 1)
+              // A mark that is plain text goes inside the Button, so the row has no sibling to catch the
+              // pointer: on the terminal a click on the name missed whenever the mark stood beside it.
+              if (!(hasClient && (s.status === 'waiting' || s.status === 'working'))) {
+                return (
+                  <Box key={`s-${i}`} width={inner} hover={{ backgroundColor: C.rowHover }}>
+                    <Button key={`s-row-${i}`} plain onPress={() => messageSession(s)}>
+                      {mark}
+                      <Text color={C.text}>{project}</Text>
+                      <Text color={C.rose}>{nm.slice(project.length)}</Text>
+                      {gap}
+                      <Text color={actColor} bold={s.status === 'waiting'}>{act}</Text>
+                    </Button>
+                  </Box>
+                )
+              }
               return (
                 // The row's keyed Box is a hover scope: the pointer anywhere on the line, the mark included,
                 // lights the whole line. The terminal's hit region of a Button placed after a sibling lands
