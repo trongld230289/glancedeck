@@ -23,7 +23,8 @@ test('the pane draws the four blocks at 58 columns', async ($, on) => {
   for (const title of ['QUEUE', 'SESSIONS', 'AGENTS', 'SESSION LOG']) {
     expect(await ui.find({ text: title })).toBeDefined()
   }
-  expect(await ui.find({ text: /\/q <task>/ })).toBeDefined()
+  expect(await ui.find({ text: /\+ add/ })).toBeDefined()
+  expect(await ui.find({ text: /ctrl\+x/ })).toBeUndefined()
   expect(await ui.find({ text: /AGENTS · none yet|none yet/ })).toBeDefined()
   await ui.unmount()
 })
@@ -92,13 +93,13 @@ test('a subagent gets a card, its tools, and a done mark with its answer', async
   await ui.unmount()
 })
 
-test('c folds the block that holds the focus; the all tab shows other sessions', async ($, on) => {
+test('a click on a block title folds it; the all tab shows other sessions', async ($, on) => {
   mock.clock(on, { now: Date.UTC(2026, 9, 18, 10, 0, 0) })
   const ui = await $.ui.mount({ plugin: 'glancedeck', surface: 'terminal', ...PANE })
 
-  expect(await ui.find({ text: /\/q <task>/ })).toBeDefined()
-  await ui.press({ key: 'f-collapse' })
-  expect(await ui.find({ text: /\/q <task>/ })).toBeUndefined()
+  expect(await ui.find({ text: /\+ add/ })).toBeDefined()
+  await ui.press({ key: 'q-head' })
+  expect(await ui.find({ text: /\+ add/ })).toBeUndefined()
 
   await ui.press({ key: 'l-tab-all' })
   expect(await ui.find({ text: '[all]' })).toBeDefined()

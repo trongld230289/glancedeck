@@ -950,6 +950,10 @@ export const register: Register = on => {
         {label}
       </Button>
     )
+    const addNew = async () => {
+      await setView($, x => ({ ...x, editing: 'new', focusBlock: 'queue' }))
+      await focusInput($, 'q-new')
+    }
     const queueBlock = frame('queue', C.queue, q.items.length > 0 && !q.paused && !usageHold, [
       headRow(
         'queue',
@@ -969,8 +973,17 @@ export const register: Register = on => {
         ? [
             ...q.items.map(itemRow),
             ...(v.editing === 'new' ? [editor('q-new', '', text => addItem($, text, false))] : []),
-            ...(q.items.length === 0 && v.editing !== 'new'
-              ? [row('q-empty', <Text color={C.faint}>/q &lt;task&gt; or q to add. Sent when Claude is idle.</Text>, null)]
+            ...(v.editing !== 'new'
+              ? [
+                  row(
+                    'q-add',
+                    <Button key="q-add" plain hotkey="q" onPress={addNew}>
+                      <Text color={C.dim}>+ add</Text>
+                      {q.items.length === 0 ? <Text color={C.faint}> · or /q &lt;task&gt;; sent when Claude is idle</Text> : null}
+                    </Button>,
+                    null,
+                  ),
+                ]
               : []),
             ...(sentToday > 0 ? [row('q-sent', <Text color={C.faint}>{`• sent today: ${sentToday}`}</Text>, null)] : []),
             ...(isQueueFocused && q.items.length > 0
@@ -1488,42 +1501,6 @@ export const register: Register = on => {
           {turnBlock}
           {agentsBlock}
           {logBlock}
-        </Box>
-        {e.props.isFocused ? null : (
-          <Box width={W}>
-            <Text color={C.faint} wrap="truncate">
-              <Text color={C.dim} bold>ctrl+x</Text> then <Text color={C.dim} bold>tab</Text> to enter glancedeck, then{' '}
-              <Text color={C.dim} bold>↑↓</Text> to move
-            </Text>
-          </Box>
-        )}
-        <Box width={W}>
-          {/* Unfocused, the line above already says how to move. */}
-          {e.props.isFocused ? <Text color={C.faint}>↑↓ move · </Text> : null}
-          <Button key="f-queue" plain hotkey="q" onPress={async () => {
-              await setView($, x => ({ ...x, editing: 'new', focusBlock: 'queue' }))
-              await focusInput($, 'q-new')
-            }}>
-            add to queue
-          </Button>
-          <Text color={C.faint}> · </Text>
-          <Button
-            key="f-send"
-            plain
-            hotkey="s"
-            onPress={() => setView($, x => ({ ...x, picking: { kind: 'message' }, focusBlock: 'sessions' }))}
-          >
-            message session
-          </Button>
-          <Text color={C.faint}> · </Text>
-          <Button
-            key="f-collapse"
-            plain
-            hotkey="c"
-            onPress={() => setView($, x => ({ ...x, collapsed: toggle(x.collapsed, x.focusBlock) }))}
-          >
-            collapse
-          </Button>
         </Box>
       </Box>
     )

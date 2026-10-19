@@ -41,11 +41,11 @@ In the desktop app, where `/plugin` does not run: click + next to the prompt box
 
 Focus the pane with `ctrl+x tab`; Tab and the arrows walk the rows, Enter presses.
 
-With the mouse: click a block's title to fold or unfold it; click another session's row to message it (click again to close).
+With the mouse: click a block's title to fold or unfold it; click **+ add** in QUEUE to add an item; click another session's row to message it (click again to close).
 
 | Key | Does |
 |---|---|
-| `q` | add an item · `s` message another session · `c` fold the focused block |
+| `q` | add an item |
 | `k` / `j` | move the selected item up / down |
 | `e` · `d` · `p` | edit · delete · pause or resume |
 | `n` | send the head item now |
