@@ -1003,15 +1003,6 @@ export const register: Register = on => {
       await setView($, x => ({ ...x, picking: null, messageTo: s.sessionId }))
       await focusInput($, 's-msg-input')
     }
-    // A Button holds only text, so a row's name and its activity are each wrapped; a spinner beside them stays outside.
-    const clickable = (key: string, s: (typeof sessions)[number], child: JSX.Element) =>
-      canMessage(s) ? (
-        <Button key={key} plain onPress={() => messageSession(s)}>
-          {child}
-        </Button>
-      ) : (
-        child
-      )
     const messageTarget = v.messageTo ? sessions.find(s => s.sessionId === v.messageTo) : undefined
     const waiting = sessions.filter(s => s.status === 'waiting').length
     const MARK: Record<SessionRow['status'], { icon: string; color: string }> = {
@@ -1102,54 +1093,65 @@ export const register: Register = on => {
           ]
         : []),
       ...(isOpen('sessions') && !picking
-        ? sessions.map((s, i) =>
-            row(
-              `s-${i}`,
+        ? sessions.map((s, i) => {
+            const mark =
               s.status === 'waiting' ? (
-                <Box>
-                  {hasClient ? (
-                    <Box flexShrink={0}>
-                      <els.Client
-                        key={`s-pulse-${i}`}
-                        module="./pulse.tsx"
-                        props={{ text: ` ! ${s.project} `, fg: C.ink, a: C.sessions, b: C.ember, bold: true, stopAfterMs: PULSE_MS }}
-                      />
-                    </Box>
-                  ) : (
-                    <Text backgroundColor={C.sessions} color={C.ink} bold>{` ! ${s.project} `}</Text>
-                  )}
-                  {clickable(`s-acc-${i}`, s, <Text wrap="truncate">{s.account ? <Text color={C.rose}>{` @${s.account}`}</Text> : null}</Text>)}
+                hasClient ? (
+                  <Box key={`s-mark-${i}`} flexShrink={0}>
+                    <els.Client
+                      key={`s-pulse-${i}`}
+                      module="./pulse.tsx"
+                      props={{ text: ` ! ${s.project} `, fg: C.ink, a: C.sessions, b: C.ember, bold: true, stopAfterMs: PULSE_MS }}
+                    />
+                  </Box>
+                ) : (
+                  <Text key={`s-mark-${i}`} backgroundColor={C.sessions} color={C.ink} bold>{` ! ${s.project} `}</Text>
+                )
+              ) : s.status === 'working' && hasClient ? (
+                <Box key={`s-mark-${i}`} flexShrink={0}>
+                  <Text> </Text>
+                  <els.Client key={`s-spin-${i}`} module="./spin.tsx" props={{ color: C.ember, now }} />
+                  <Text> </Text>
                 </Box>
               ) : (
-                <Box>
-                  {s.status === 'working' && hasClient ? (
-                    <Box flexShrink={0}>
-                      <Text> </Text>
-                      <els.Client key={`s-spin-${i}`} module="./spin.tsx" props={{ color: C.ember, now }} />
-                      <Text> </Text>
-                    </Box>
-                  ) : (
-                    <Text color={MARK[s.status].color}>{` ${MARK[s.status].icon} `}</Text>
-                  )}
-                  {clickable(
-                    `s-name-${i}`,
-                    s,
-                    <Text wrap="truncate">
-                      <Text color={C.text}>{` ${s.project}`}</Text>
-                      {s.account ? <Text color={C.rose}>{` @${s.account}`}</Text> : null}
-                    </Text>,
-                  )}
+                <Text key={`s-mark-${i}`} color={MARK[s.status].color}>{` ${MARK[s.status].icon} `}</Text>
+              )
+            const markWidth = s.status === 'waiting' ? s.project.length + 4 : 3
+            const name = `${s.status === 'waiting' ? '' : ` ${s.project}`}${s.account ? ` @${s.account}` : ''}`
+            const activity = s.elapsed ? `${s.activity} · ${s.elapsed}` : s.activity
+            const actColor = s.status === 'waiting' ? C.sessions : C.dim
+            if (canMessage(s)) {
+              // A Button has no width of its own, so the gap between name and activity is spaces inside it:
+              // a click anywhere right of the mark opens the message line, not only on the words.
+              const room = Math.max(0, inner - markWidth)
+              const act = shorten(activity, Math.max(1, room - 1))
+              const nm = name.length > room - act.length - 1 ? shorten(name, Math.max(1, room - act.length - 1)) : name
+              const gap = ' '.repeat(Math.max(1, room - nm.length - act.length))
+              const project = s.status === 'waiting' ? '' : nm.slice(0, s.project.length + 1)
+              return (
+                <Box key={`s-${i}`} width={inner}>
+                  {mark}
+                  <Button key={`s-row-${i}`} plain onPress={() => messageSession(s)}>
+                    <Text color={C.text}>{project}</Text>
+                    <Text color={C.rose}>{nm.slice(project.length)}</Text>
+                    {gap}
+                    <Text color={actColor} bold={s.status === 'waiting'}>{act}</Text>
+                  </Button>
                 </Box>
-              ),
-              clickable(
-                `s-act-${i}`,
-                s,
-                <Text color={s.status === 'waiting' ? C.sessions : C.dim} bold={s.status === 'waiting'}>
-                  {s.elapsed ? `${s.activity} · ${s.elapsed}` : s.activity}
-                </Text>,
-              ),
-            ),
-          )
+              )
+            }
+            return row(
+              `s-${i}`,
+              <Box>
+                {mark}
+                <Text wrap="truncate">
+                  <Text color={C.text}>{s.status === 'waiting' ? '' : ` ${s.project}`}</Text>
+                  {s.account ? <Text color={C.rose}>{` @${s.account}`}</Text> : null}
+                </Text>
+              </Box>,
+              <Text color={actColor} bold={s.status === 'waiting'}>{activity}</Text>,
+            )
+          })
         : []),
     ])
 

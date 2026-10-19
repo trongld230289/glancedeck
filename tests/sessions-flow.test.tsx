@@ -93,11 +93,11 @@ test('other sessions show up across accounts; one waiting 3 minutes alerts once;
   await pane.press({ key: 'l-tab-all' })
   expect(await pane.find({ text: /acme-api asks/ })).toBeDefined()
   // A click on another session's row opens the message line to it; a second click closes it.
-  await pane.press({ key: 's-name-1' })
+  await pane.press({ key: 's-row-1' })
   expect(await pane.find({ text: /→ acme-web: / })).toBeDefined()
-  await pane.press({ key: 's-act-1' })
+  await pane.press({ key: 's-row-1' })
   expect(await pane.find({ text: /→ acme-web: / })).toBeUndefined()
-  await pane.press({ key: 's-acc-0' })
+  await pane.press({ key: 's-row-0' })
   expect(await pane.find({ text: /→ acme-api @acc2: / })).toBeDefined()
   await pane.unmount()
 
