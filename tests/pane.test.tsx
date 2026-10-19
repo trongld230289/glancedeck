@@ -135,3 +135,14 @@ test('the TURN block runs while the main turn does, then becomes a receipt', asy
   expect(await ui.find({ text: /× last turn · 1:19/ })).toBeDefined()
   await ui.unmount()
 })
+
+test('the pane colors follow the host theme off a dark terminal', async ($, on) => {
+  mock.clock(on, { now: Date.UTC(2026, 9, 18, 10, 0, 0) })
+  on('session.cwd', () => ({ value: 'D:/Project/glanceline' }))
+  for (const [surface, text] of [['terminal', '#E6E8EE'], ['desktop', 'text']] as const) {
+    const ui = await $.ui.mount({ plugin: 'glancedeck', surface, ...PANE })
+    const mark = await ui.find({ key: 'wordmark' })
+    expect((mark?.props as { props?: { text?: string } })?.props?.text).toBe(text)
+    await ui.unmount()
+  }
+})

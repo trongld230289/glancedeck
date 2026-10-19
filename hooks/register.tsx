@@ -49,7 +49,8 @@ const COUNTDOWN_MS = 5000
 const PULSE_MS = 30_000
 
 // Hue names a block; inside a block, color only says state: lantern waits on you, ember works, jade is done.
-const C = {
+// Tuned by hand for a dark terminal.
+const DARK = {
   queue: '#5EE6E6',
   queueLit: '#167A80',
   queueDeep: '#0D3B40',
@@ -66,9 +67,39 @@ const C = {
   ink: '#000000',
   emberLit: '#FFD9C2',
   agentsLit: '#D6DDFF',
+  // The wordmark's "deck" rolls through these while anything works.
+  ramp: ['#5EE6E6', '#3BB0B3', '#167A80'],
 }
-// The wordmark's "deck" rolls through these while anything works.
-const DECK_RAMP = ['#5EE6E6', '#3BB0B3', '#167A80']
+type Palette = typeof DARK
+// Everywhere else (Desktop, VS Code, a light terminal theme) the same roles by theme key, so the host's own
+// light or dark theme picks the shade: the dark palette's near-white text vanished on Desktop's white page.
+const THEMED: Palette = {
+  queue: 'planMode',
+  queueLit: 'planMode',
+  queueDeep: 'inactive',
+  sessions: 'warning',
+  agents: 'suggestion',
+  log: 'inactive',
+  text: 'text',
+  dim: 'inactive',
+  faint: 'subtle',
+  jade: 'success',
+  ember: 'claude',
+  rose: 'bashBorder',
+  alarm: 'error',
+  ink: 'inverseText',
+  emberLit: 'text',
+  agentsLit: 'text',
+  ramp: ['planMode', 'suggestion', 'ide'],
+}
+const paletteOf = async ($: EngineInterface, surface: string): Promise<Palette> => {
+  if (surface !== 'terminal') return THEMED
+  const theme = await $.config
+    .list()
+    .then(rows => rows.find(r => r.key === 'theme')?.value)
+    .catch(() => undefined)
+  return typeof theme === 'string' && theme.startsWith('light') ? THEMED : DARK
+}
 
 const DEFAULT_VIEW: View = {
   collapsed: [],
@@ -733,6 +764,7 @@ export const register: Register = on => {
     const isHeld = Boolean(head?.isBlocked)
     if (!head || (!isCounting && !isHeld)) return next(e)
     const { Box, Text, Button } = $.ui.resolve(e)
+    const C = await paletteOf($, e.surface)
 
     return (
       <Box>
@@ -762,6 +794,7 @@ export const register: Register = on => {
     const { Box, Text, Button } = els
     const Input = 'Input' in els ? els.Input : null
     const hasClient = 'Client' in els
+    const C = await paletteOf($, e.surface)
     const [v0, cards0, lines0, q0, rt0, beats0, selfBeat, turn0, selfId, cwd, now] = await Promise.all([
       read($, view),
       read($, agents),
@@ -889,7 +922,7 @@ export const register: Register = on => {
                 now,
                 total: COUNTDOWN_MS,
                 width: inner,
-                fg: C.text,
+                fg: C === DARK ? C.text : C.ink,
                 lit: C.queueLit,
                 dark: C.queueDeep,
               }}
@@ -1421,7 +1454,7 @@ export const register: Register = on => {
         <Box width={W} marginBottom={1}>
           <Box flexGrow={1} flexShrink={1}>
             {hasClient ? (
-              <els.Client key="wordmark" module="./wordmark.tsx" props={{ isBusy: isTurnLive || running > 0, text: C.text, ramp: DECK_RAMP }} />
+              <els.Client key="wordmark" module="./wordmark.tsx" props={{ isBusy: isTurnLive || running > 0, text: C.text, ramp: C.ramp }} />
             ) : (
               <Text wrap="truncate">
                 {/* ♦ is in Consolas, so the terminal draws it in one cell; ◈ came from a fallback font and spilled over the next cell. */}
@@ -1448,11 +1481,14 @@ export const register: Register = on => {
             {chip(C.agents, plural(running, 'agent'), running > 0)}
           </Box>
         </Box>
-        {sessionsBlock}
-        {queueBlock}
-        {turnBlock}
-        {agentsBlock}
-        {logBlock}
+        {/* A terminal's borders already part the blocks; elsewhere they touched, so give them air. */}
+        <Box flexDirection="column" gap={e.surface === 'terminal' ? 0 : 1}>
+          {sessionsBlock}
+          {queueBlock}
+          {turnBlock}
+          {agentsBlock}
+          {logBlock}
+        </Box>
         {e.props.isFocused ? null : (
           <Box width={W}>
             <Text color={C.faint} wrap="truncate">
