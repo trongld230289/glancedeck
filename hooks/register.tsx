@@ -1180,15 +1180,20 @@ export const register: Register = on => {
               const project = s.status === 'waiting' ? '' : nm.slice(0, s.project.length + 1)
               return (
                 // The row's keyed Box is a hover scope: the pointer anywhere on the line, the mark included,
-                // lights the whole line, not only where the Button's own region starts.
+                // lights the whole line. The terminal's hit region of a Button placed after a sibling lands
+                // that sibling's width to the right of where it is drawn, so the Button starts the row (blanks
+                // under the mark) and the mark, which may be a Client, is painted over those blanks.
                 <Box key={`s-${i}`} width={inner} hover={{ backgroundColor: C.rowHover }}>
-                  {mark}
                   <Button key={`s-row-${i}`} plain onPress={() => messageSession(s)}>
+                    {' '.repeat(markWidth)}
                     <Text color={C.text}>{project}</Text>
                     <Text color={C.rose}>{nm.slice(project.length)}</Text>
                     {gap}
                     <Text color={actColor} bold={s.status === 'waiting'}>{act}</Text>
                   </Button>
+                  <Box position="absolute" left={0} top={0}>
+                    {mark}
+                  </Box>
                 </Box>
               )
             }
