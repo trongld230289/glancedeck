@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { applyStep, describeCall, expandImages, fmtElapsed, imageNumbers, sessionDirName, kTokens, prettyModel, promptText, pushLog, LOG_MAX } from '../hooks/core'
+import { applyStep, describeCall, imageContext, fmtElapsed, imageNumbers, sessionDirName, kTokens, prettyModel, promptText, pushLog, LOG_MAX } from '../hooks/core'
 import type { AgentCard } from '../types'
 
 const card: AgentCard = { id: 'a', name: 'x', ctx: 0, out: 0, spawnedAt: 0, endedAt: null, status: 'running', tools: [], answer: '' }
@@ -8,7 +8,8 @@ const card: AgentCard = { id: 'a', name: 'x', ctx: 0, out: 0, spawnedAt: 0, ende
 test('pasted image refs: numbers, the session folder name, and expansion of known files only', () => {
   expect(imageNumbers('[Image #4] a [Image #4] [Image #12]')).toEqual([4, 12])
   expect(sessionDirName('D:\\Project\\vi-voice')).toBe('D--Project-vi-voice')
-  expect(expandImages('[Image #1] [Image #2] x', new Map([[1, 'C:/t/1.png']]))).toBe('[Image: source: C:/t/1.png] [Image #2] x')
+  expect(imageContext({ 1: 'C:/t/1.png' })).toEqual(['[Image #1] in the prompt is the image pasted by the person: [Image: source: C:/t/1.png]'])
+  expect(imageContext(undefined)).toEqual([])
 })
 
 test('describeCall names the file, command or pattern, with secrets masked', () => {

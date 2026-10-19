@@ -86,15 +86,21 @@ test('/q while idle counts down 5 seconds, then sends the text as the person', a
   expect(JSON.parse(w.queueText()).sent.length).toBe(1)
 })
 
-test('a /q with a pasted image sends the image file along, not the bare [Image #N]', async ($, on) => {
+test('a /q with a pasted image keeps [Image #N] short in the prompt and hands the model the file', { timeoutMs: 30000 }, async ($, on) => {
   const w = world(on)
+  const session = mock.session(on)
   const saved = 'C:\\Users\\t\\Temp\\claude\\D--Project-glanceline\\s1\\images\\4.png'
   on('session.id', () => ({ value: 's1' }))
   on('fs.exists', (_, e) => ({ value: e.path === saved }) as never)
   await q($, '[Image #4] [Image #9] sửa lỗi này')
+  expect(JSON.parse(w.queueText()).items[0].images).toEqual({ 4: saved })
 
   await w.clock.advance(5000)
-  expect(w.submitted).toEqual([{ text: `[Image: source: ${saved}] [Image #9] sửa lỗi này`, asUser: true }])
+  expect(w.submitted).toEqual([{ text: '[Image #4] [Image #9] sửa lỗi này', asUser: true }])
+  expect(session.appended().map(r => r.message.content)).toEqual([
+    [{ type: 'text', text: `[Image #4] in the prompt is the image pasted by the person: [Image: source: ${saved}]` }],
+  ])
+  expect(JSON.parse(w.queueText()).sent[0].text).toBe('[Image #4] [Image #9] sửa lỗi này')
 })
 
 test('items wait for the turn and for background agents, then go one at a time', async ($, on) => {

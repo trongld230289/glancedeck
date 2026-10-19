@@ -59,6 +59,8 @@ export type QueueItem = {
   sender?: string
   /** Held at the head: its --if-ok check failed. Cleared by resume, edit or send-now. */
   isBlocked?: true
+  /** Each pasted `[Image #N]` of `text` to the file Claude Code saved for it: the model is told, the person sees `[Image #N]`. */
+  images?: Record<string, string>
 }
 
 export type PauseReason = 'user' | 'cancel' | 'if-ok' | 'usage'

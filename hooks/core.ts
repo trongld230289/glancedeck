@@ -109,9 +109,6 @@ export const imageNumbers = (text: string): number[] => [...new Set([...text.mat
 
 export const sessionDirName = (cwd: string) => cwd.replace(/[^a-zA-Z0-9]/g, '-')
 
-/** Each `[Image #N]` with a known file becomes the reference the model reads it by; unknown ones stay. */
-export const expandImages = (text: string, files: ReadonlyMap<number, string>) =>
-  text.replace(IMAGE_REF, (ref, n: string) => {
-    const path = files.get(Number(n))
-    return path ? `[Image: source: ${path}]` : ref
-  })
+/** What the model reads beside a sent item: where each `[Image #N]` of it is, so the prompt itself stays short. */
+export const imageContext = (images: Readonly<Record<string, string>> | undefined): string[] =>
+  Object.entries(images ?? {}).map(([n, path]) => `[Image #${n}] in the prompt is the image pasted by the person: [Image: source: ${path}]`)

@@ -8,7 +8,7 @@ import {
   applyStep,
   basename,
   describeCall,
-  expandImages,
+  imageContext,
   fmtClock,
   fmtElapsed,
   fmtUntil,
@@ -176,10 +176,10 @@ async function queuePath($: EngineInterface, key?: string): Promise<string | nul
   return dir && k ? `${dir}/queues/${k}.json` : null
 }
 
-/** Points each `[Image #N]` of a /q at the file Claude Code saved for it, so the prompt sent later still shows the image. */
-async function withImages($: EngineInterface, text: string): Promise<string> {
+/** The file Claude Code saved for each `[Image #N]` of a /q, so the prompt sent later still carries the image. */
+async function findImages($: EngineInterface, text: string): Promise<Record<string, string>> {
   const numbers = imageNumbers(text)
-  if (numbers.length === 0) return text
+  if (numbers.length === 0) return {}
   const [id, first, now, ...temps] = await Promise.all([
     $.session.id().catch(() => ''),
     projectCwd($),
@@ -190,7 +190,7 @@ async function withImages($: EngineInterface, text: string): Promise<string> {
   ])
   const roots = [...new Set([...temps, '/tmp'].filter((t): t is string => Boolean(t)))]
   const cwds = [...new Set([first, now].filter((c): c is string => Boolean(c)))]
-  const files = new Map<number, string>()
+  const files: Record<string, string> = {}
   for (const n of numbers) {
     find: for (const root of roots) {
       const sep = root.includes('\\') ? '\\' : '/'
@@ -198,14 +198,14 @@ async function withImages($: EngineInterface, text: string): Promise<string> {
         for (const ext of IMAGE_EXTS) {
           const path = [root.replace(/[\\/]+$/, ''), 'claude', sessionDirName(cwd), id, 'images', `${n}.${ext}`].join(sep)
           if (await $.fs.exists(path).catch(() => false)) {
-            files.set(n, path)
+            files[String(n)] = path
             break find
           }
         }
       }
     }
   }
-  return expandImages(text, files)
+  return files
 }
 
 async function readQueueFile($: EngineInterface, path: string): Promise<QueueFile> {
@@ -417,14 +417,27 @@ async function sendHead($: EngineInterface, id: string, isForced: boolean) {
     return
   }
   await say($, { who: 'queue', label: 'queue', text: `sent: ${shorten(result.item.text, 60)}` })
+  // The prompt shows `[Image #N]`; a row the person does not see tells the model where each one is.
+  // (Not a prompt.submit hook's context: a plugin's own hooks skip the prompt it submits.)
+  const images = imageContext(result.item.images)
+  if (images.length > 0) {
+    await $.session.append({ message: { type: 'user', content: [{ type: 'text', text: images.join('\n') }] } }).catch(() => undefined)
+  }
   await $.prompt.submit({ text: result.item.text, asUser: true })
 }
 
-async function addItem($: EngineInterface, text: string, ifOk: boolean): Promise<QueueItem> {
+async function addItem($: EngineInterface, text: string, ifOk: boolean, images: Record<string, string> = {}): Promise<QueueItem> {
   const now = await $.clock.now()
   made += 1
   const sender = await $.session.id().catch(() => null)
-  const item: QueueItem = { id: newId(now, made), text, ifOk, addedAt: now, ...(sender ? { sender } : {}) }
+  const item: QueueItem = {
+    id: newId(now, made),
+    text,
+    ifOk,
+    addedAt: now,
+    ...(sender ? { sender } : {}),
+    ...(Object.keys(images).length > 0 ? { images } : {}),
+  }
   await changeQueue($, q => ({ ...q, items: [...q.items, item] }))
   await maybeStart($)
   return item
@@ -512,7 +525,7 @@ export const register: Register = on => {
       return { text: 'Usage: /q <text> · /q --if-ok <text> · /q list · /q clear · /q pause · /q resume' }
     }
     if (cmd.kind === 'add') {
-      const item = await addItem($, await withImages($, cmd.text), cmd.ifOk)
+      const item = await addItem($, cmd.text, cmd.ifOk, await findImages($, cmd.text))
       const q = normalizeQueue(await read($, queue))
       const at = q.items.findIndex(i => i.id === item.id) + 1
       return { text: `Queued #${at}${cmd.ifOk ? ' (if the turn before has no errors)' : ''}: ${shorten(cmd.text, 70)}` }
