@@ -17,9 +17,9 @@ type Props = {
 }
 type State = { lastNow: number; ticks: number }
 
-const STEP_MS = 120
-// A block walking round a cell; every glyph is in Consolas, so the terminal never borrows a wider fallback.
-const FRAMES = ['▀', '▐', '▄', '▌']
+const STEP_MS = 100
+// The braille dots: calm to watch (the block walking round a cell was tried in 0.2.16 and bounced too much).
+const FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
 
 const Spin: ClientModule<Props, State> = (props, surface) => {
   const { Text } = surface.elements

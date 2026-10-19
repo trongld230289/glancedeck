@@ -99,3 +99,19 @@ export const prettyModel = (id: string) => {
   if (m?.[1] && m[2]) return `${m[1].charAt(0).toUpperCase()}${m[1].slice(1).toLowerCase()} ${m[2]}${m[3] ? `.${m[3]}` : ''}`
   return shorten(id, 18)
 }
+
+// A pasted image reaches a slash command as `[Image #N]` alone; Claude Code keeps its file as
+// <temp>/claude/<cwd, every non-alphanumeric a dash>/<session id>/images/N.<ext>.
+export const IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'webp', 'gif']
+const IMAGE_REF = /\[Image #(\d+)\]/g
+
+export const imageNumbers = (text: string): number[] => [...new Set([...text.matchAll(IMAGE_REF)].map(m => Number(m[1])))]
+
+export const sessionDirName = (cwd: string) => cwd.replace(/[^a-zA-Z0-9]/g, '-')
+
+/** Each `[Image #N]` with a known file becomes the reference the model reads it by; unknown ones stay. */
+export const expandImages = (text: string, files: ReadonlyMap<number, string>) =>
+  text.replace(IMAGE_REF, (ref, n: string) => {
+    const path = files.get(Number(n))
+    return path ? `[Image: source: ${path}]` : ref
+  })

@@ -8,9 +8,12 @@ import {
   applyStep,
   basename,
   describeCall,
+  expandImages,
   fmtClock,
   fmtElapsed,
   fmtUntil,
+  IMAGE_EXTS,
+  imageNumbers,
   isLogged,
   kTokens,
   noteTool,
@@ -18,6 +21,7 @@ import {
   prettyModel,
   promptText,
   pushLog,
+  sessionDirName,
   shorten,
 } from './core'
 import {
@@ -170,6 +174,38 @@ async function queueKey($: EngineInterface): Promise<string | null> {
 async function queuePath($: EngineInterface, key?: string): Promise<string | null> {
   const [dir, k] = [await sharedDir($), key ?? (await queueKey($))]
   return dir && k ? `${dir}/queues/${k}.json` : null
+}
+
+/** Points each `[Image #N]` of a /q at the file Claude Code saved for it, so the prompt sent later still shows the image. */
+async function withImages($: EngineInterface, text: string): Promise<string> {
+  const numbers = imageNumbers(text)
+  if (numbers.length === 0) return text
+  const [id, first, now, ...temps] = await Promise.all([
+    $.session.id().catch(() => ''),
+    projectCwd($),
+    $.session.cwd().catch(() => null),
+    $.env.get('CLAUDE_CODE_TMPDIR'),
+    $.env.get('TEMP'),
+    $.env.get('TMP'),
+  ])
+  const roots = [...new Set([...temps, '/tmp'].filter((t): t is string => Boolean(t)))]
+  const cwds = [...new Set([first, now].filter((c): c is string => Boolean(c)))]
+  const files = new Map<number, string>()
+  for (const n of numbers) {
+    find: for (const root of roots) {
+      const sep = root.includes('\\') ? '\\' : '/'
+      for (const cwd of cwds) {
+        for (const ext of IMAGE_EXTS) {
+          const path = [root.replace(/[\\/]+$/, ''), 'claude', sessionDirName(cwd), id, 'images', `${n}.${ext}`].join(sep)
+          if (await $.fs.exists(path).catch(() => false)) {
+            files.set(n, path)
+            break find
+          }
+        }
+      }
+    }
+  }
+  return expandImages(text, files)
 }
 
 async function readQueueFile($: EngineInterface, path: string): Promise<QueueFile> {
@@ -476,7 +512,7 @@ export const register: Register = on => {
       return { text: 'Usage: /q <text> · /q --if-ok <text> · /q list · /q clear · /q pause · /q resume' }
     }
     if (cmd.kind === 'add') {
-      const item = await addItem($, cmd.text, cmd.ifOk)
+      const item = await addItem($, await withImages($, cmd.text), cmd.ifOk)
       const q = normalizeQueue(await read($, queue))
       const at = q.items.findIndex(i => i.id === item.id) + 1
       return { text: `Queued #${at}${cmd.ifOk ? ' (if the turn before has no errors)' : ''}: ${shorten(cmd.text, 70)}` }
@@ -917,7 +953,7 @@ export const register: Register = on => {
             ...(q.items.length === 0 && v.editing !== 'new'
               ? [row('q-empty', <Text color={C.faint}>/q &lt;task&gt; or q to add. Sent when Claude is idle.</Text>, null)]
               : []),
-            ...(sentToday > 0 ? [row('q-sent', <Text color={C.faint}>{`√ sent today: ${sentToday}`}</Text>, null)] : []),
+            ...(sentToday > 0 ? [row('q-sent', <Text color={C.faint}>{`• sent today: ${sentToday}`}</Text>, null)] : []),
             ...(isQueueFocused && q.items.length > 0
               ? [
                   <Box key="q-keys" width={inner}>
@@ -979,7 +1015,7 @@ export const register: Register = on => {
     const MARK: Record<SessionRow['status'], { icon: string; color: string }> = {
       waiting: { icon: '!', color: C.sessions },
       working: { icon: '●', color: C.ember },
-      done: { icon: '√', color: C.jade },
+      done: { icon: '○', color: C.jade },
     }
     const sessionsBlock = frame('sessions', C.sessions, waiting > 0, [
       headRow(
@@ -1126,7 +1162,7 @@ export const register: Register = on => {
       c.status !== 'running' ? (
         <Text
           color={c.status === 'done' ? C.jade : C.alarm}
-        >{`${c.status === 'done' ? '√' : '×'} ${fmtElapsed((c.endedAt ?? now) - c.spawnedAt)}`}</Text>
+        >{`${c.status === 'done' ? '•' : '×'} ${fmtElapsed((c.endedAt ?? now) - c.spawnedAt)}`}</Text>
       ) : hasClient ? (
         <els.Client key={`a-clock-${c.id}`} module="./spin.tsx" props={{ since: c.spawnedAt, now, color: C.ember }} />
       ) : (
@@ -1217,7 +1253,7 @@ export const register: Register = on => {
                 )
               ) : (
                 <Text color={a.status === 'done' ? C.jade : C.alarm}>
-                  {`${a.status === 'done' ? '√' : '×'} ${fmtElapsed((a.endedAt ?? now) - a.spawnedAt)}`}
+                  {`${a.status === 'done' ? '•' : '×'} ${fmtElapsed((a.endedAt ?? now) - a.spawnedAt)}`}
                 </Text>
               )),
               undefined,
@@ -1250,11 +1286,13 @@ export const register: Register = on => {
         <Text color={t.agents > 0 ? C.agents : C.dim}>{plural(t.agents, 'agent')}</Text>
       </Text>
     )
-    // One cell per tool call, newest on the right, colored by the kind of work; the pointer on it shows the key.
-    const CALL_COLOR: Record<string, string> = { e: C.jade, r: C.ember, a: C.agents, s: C.log, o: C.faint, x: C.alarm }
+    // A meter like glanceline's 5h bar: one ▰ per tool call, colored by the kind of work, on a track of faint ▱;
+    // past the width it shows the latest. The pointer on it shows the key.
+    const CALL_COLOR: Record<string, string> = { e: C.jade, r: C.ember, a: C.agents, s: C.dim, o: C.log, x: C.alarm }
     const calls = t.calls ?? ''
     const callsLabel = plural(calls.length, 'call')
-    const cells = calls.slice(-Math.max(4, inner - callsLabel.length - 1))
+    const track = Math.max(4, inner - callsLabel.length - 1)
+    const cells = calls.slice(-track)
     const runs: { kind: string; n: number }[] = []
     for (const k of cells) {
       const last = runs[runs.length - 1]
@@ -1266,20 +1304,21 @@ export const register: Register = on => {
       <Text wrap="truncate">
         {runs.map((r, k) => (
           <Text key={`t-run-${k}`} color={CALL_COLOR[r.kind] ?? C.faint}>
-            {'█'.repeat(r.n)}
+            {'▰'.repeat(r.n)}
           </Text>
         ))}
+        <Text color={C.faint}>{'▱'.repeat(track - cells.length)}</Text>
       </Text>,
       <Text color={C.faint}>{callsLabel}</Text>,
       undefined,
       hoverCard(C.ember, [
         <Text key="c-key" wrap="truncate">
-          <Text color={C.jade}>█ edit </Text>
-          <Text color={C.ember}>█ run </Text>
-          <Text color={C.agents}>█ agent </Text>
-          <Text color={C.log}>█ read </Text>
-          <Text color={C.faint}>█ other </Text>
-          <Text color={C.alarm}>█ failed</Text>
+          <Text color={C.jade}>▰ edit </Text>
+          <Text color={C.ember}>▰ run </Text>
+          <Text color={C.agents}>▰ agent </Text>
+          <Text color={C.dim}>▰ read </Text>
+          <Text color={C.log}>▰ other </Text>
+          <Text color={C.alarm}>▰ failed</Text>
         </Text>,
       ]),
     )
@@ -1320,7 +1359,7 @@ export const register: Register = on => {
         row(
           't-last',
           <Text color={isTurnOk ? C.jade : C.alarm}>
-            {`${isTurnOk ? '√' : '×'} last turn · ${fmtElapsed((t.endedAt ?? now) - t.startedAt)}`}
+            {`${isTurnOk ? '•' : '×'} last turn · ${fmtElapsed((t.endedAt ?? now) - t.startedAt)}`}
             {t.reason && t.reason !== 'answer' ? ` · stopped (${t.reason})` : ''}
           </Text>,
           <Text color={C.faint}>{`ended ${fmtClock(t.endedAt ?? now)}`}</Text>,

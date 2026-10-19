@@ -30,7 +30,7 @@ const BAND = {
 /** A session on D:/Project/glanceline with an in-memory disk; returns the disk, the clock and what was submitted. */
 function world(on: On) {
   const clock = mock.clock(on, { now: Date.UTC(2026, 9, 18, 3, 0, 0) })
-  mock.env(on, { USERPROFILE: 'C:\\Users\\t', OS: 'Windows_NT' })
+  mock.env(on, { USERPROFILE: 'C:\\Users\\t', OS: 'Windows_NT', TEMP: 'C:\\Users\\t\\Temp' })
   const files = new Map<string, string>()
   const submitted: { text: string; asUser?: true }[] = []
   const toasts: string[] = []
@@ -84,6 +84,17 @@ test('/q while idle counts down 5 seconds, then sends the text as the person', a
   expect(w.submitted).toEqual([{ text: 'viết test cho install.py', asUser: true }])
   expect(JSON.parse(w.queueText()).items).toEqual([])
   expect(JSON.parse(w.queueText()).sent.length).toBe(1)
+})
+
+test('a /q with a pasted image sends the image file along, not the bare [Image #N]', async ($, on) => {
+  const w = world(on)
+  const saved = 'C:\\Users\\t\\Temp\\claude\\D--Project-glanceline\\s1\\images\\4.png'
+  on('session.id', () => ({ value: 's1' }))
+  on('fs.exists', (_, e) => ({ value: e.path === saved }) as never)
+  await q($, '[Image #4] [Image #9] sửa lỗi này')
+
+  await w.clock.advance(5000)
+  expect(w.submitted).toEqual([{ text: `[Image: source: ${saved}] [Image #9] sửa lỗi này`, asUser: true }])
 })
 
 test('items wait for the turn and for background agents, then go one at a time', async ($, on) => {

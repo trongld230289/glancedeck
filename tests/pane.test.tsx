@@ -84,7 +84,7 @@ test('a subagent gets a card, its tools, and a done mark with its answer', async
   } as never)
   ui = await $.ui.mount({ plugin: 'glancedeck', surface: 'terminal', ...PANE })
   expect(await ui.find({ text: /0 running · 1 total/ })).toBeDefined()
-  expect(await ui.find({ text: '√ 2:38' })).toBeDefined()
+  expect(await ui.find({ text: '• 2:38' })).toBeDefined()
 
   await ui.press({ key: 'a-0' })
   expect(await ui.find({ text: /Read → src\/flow\.ts/ })).toBeDefined()
