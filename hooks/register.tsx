@@ -64,7 +64,6 @@ const C = {
   rose: '#F39BD0',
   alarm: '#FF7A7A',
   ink: '#000000',
-  card: '#161A22',
   emberLit: '#FFD9C2',
   agentsLit: '#D6DDFF',
 }
@@ -791,7 +790,7 @@ export const register: Register = on => {
     const fold = (b: Block) => () => setView($, x => ({ ...x, collapsed: toggle(x.collapsed, b) }))
 
     // A row: what it is on the left, cut to fit; a fixed part on the right.
-    const row = (key: string, left: JSX.Element, right: JSX.Element | null, bg?: string, card?: JSX.Element | null) => (
+    const row = (key: string, left: JSX.Element, right: JSX.Element | null, bg?: string) => (
       <Box key={key} width={inner} backgroundColor={bg}>
         <Box flexGrow={1} flexShrink={1}>
           {left}
@@ -801,40 +800,14 @@ export const register: Register = on => {
             {right}
           </Box>
         ) : null}
-        {card ?? null}
       </Box>
-    )
-
-    // A card the pointer reveals over the rows above its row; it takes no room, so nothing below it moves.
-    // No key of its own: a keyed card would be its own hover scope, and the row's pointer would never reach it.
-    const hoverCard = (color: string, lines: JSX.Element[]) => (
-      <Box
-        position="absolute"
-        top={-(lines.length + 2)}
-        left={2}
-        width={Math.max(20, inner - 4)}
-        flexDirection="column"
-        borderStyle="round"
-        borderColor={color}
-        backgroundColor={C.card}
-        paddingX={1}
-        display="none"
-        hover={{ display: 'flex' }}
-      >
-        {lines}
-      </Box>
-    )
-    const cardLine = (key: string, color: string, text: string) => (
-      <Text key={key} color={color} wrap="truncate">
-        {text}
-      </Text>
     )
 
     const headRow = (block: Block, title: string, color: string, summary: JSX.Element, right: JSX.Element | null) =>
       row(
         `${block[0]}-head`,
         <Button key={`${block[0]}-head`} plain onPress={fold(block)}>
-          <Text color={color} bold>{`${isOpen(block) ? '' : '▸ '}${title}`}</Text>
+          <Text color={color} bold>{`${isOpen(block) ? '▾' : '▸'} ${title}`}</Text>
           {summary}
         </Button>,
         right,
@@ -1007,7 +980,8 @@ export const register: Register = on => {
     // ---- SESSIONS: the other sessions on this machine; whoever waits on you is a lit chip at the top
     const sessions = rowsOf(beats, selfId, now)
     const picking = v.picking
-    const targets = sessions.filter(s => s.queueKey && s.queueKey !== ownKey)
+    const canMessage = (s: (typeof sessions)[number]) => Boolean(s.queueKey && s.queueKey !== ownKey)
+    const targets = sessions.filter(canMessage)
     const pickSession = async (s: (typeof sessions)[number]) => {
       if (!picking) return
       if (picking.kind === 'move') {
@@ -1023,6 +997,21 @@ export const register: Register = on => {
         await focusInput($, 's-msg-input')
       }
     }
+    // A click on another session's row opens the message line to it; a second click closes it.
+    const messageSession = async (s: (typeof sessions)[number]) => {
+      if (v.messageTo === s.sessionId) return setView($, x => ({ ...x, messageTo: null }))
+      await setView($, x => ({ ...x, picking: null, messageTo: s.sessionId }))
+      await focusInput($, 's-msg-input')
+    }
+    // A Button holds only text, so a row's name and its activity are each wrapped; a spinner beside them stays outside.
+    const clickable = (key: string, s: (typeof sessions)[number], child: JSX.Element) =>
+      canMessage(s) ? (
+        <Button key={key} plain onPress={() => messageSession(s)}>
+          {child}
+        </Button>
+      ) : (
+        child
+      )
     const messageTarget = v.messageTo ? sessions.find(s => s.sessionId === v.messageTo) : undefined
     const waiting = sessions.filter(s => s.status === 'waiting').length
     const MARK: Record<SessionRow['status'], { icon: string; color: string }> = {
@@ -1129,7 +1118,7 @@ export const register: Register = on => {
                   ) : (
                     <Text backgroundColor={C.sessions} color={C.ink} bold>{` ! ${s.project} `}</Text>
                   )}
-                  <Text wrap="truncate">{s.account ? <Text color={C.rose}>{` @${s.account}`}</Text> : null}</Text>
+                  {clickable(`s-acc-${i}`, s, <Text wrap="truncate">{s.account ? <Text color={C.rose}>{` @${s.account}`}</Text> : null}</Text>)}
                 </Box>
               ) : (
                 <Box>
@@ -1142,15 +1131,23 @@ export const register: Register = on => {
                   ) : (
                     <Text color={MARK[s.status].color}>{` ${MARK[s.status].icon} `}</Text>
                   )}
-                  <Text wrap="truncate">
-                    <Text color={C.text}>{` ${s.project}`}</Text>
-                    {s.account ? <Text color={C.rose}>{` @${s.account}`}</Text> : null}
-                  </Text>
+                  {clickable(
+                    `s-name-${i}`,
+                    s,
+                    <Text wrap="truncate">
+                      <Text color={C.text}>{` ${s.project}`}</Text>
+                      {s.account ? <Text color={C.rose}>{` @${s.account}`}</Text> : null}
+                    </Text>,
+                  )}
                 </Box>
               ),
-              <Text color={s.status === 'waiting' ? C.sessions : C.dim} bold={s.status === 'waiting'}>
-                {s.elapsed ? `${s.activity} · ${s.elapsed}` : s.activity}
-              </Text>,
+              clickable(
+                `s-act-${i}`,
+                s,
+                <Text color={s.status === 'waiting' ? C.sessions : C.dim} bold={s.status === 'waiting'}>
+                  {s.elapsed ? `${s.activity} · ${s.elapsed}` : s.activity}
+                </Text>,
+              ),
             ),
           )
         : []),
@@ -1218,13 +1215,6 @@ export const register: Register = on => {
                   )}
                 </Box>,
                 withModel(c.model, clock(c)),
-                undefined,
-                hoverCard(C.agents, [
-                  cardLine('c-name', C.text, c.name),
-                  cardLine('c-tok', C.faint, `${kTokens(c.ctx)} context · ${kTokens(c.out)} output${c.model ? ` · ${prettyModel(c.model)}` : ''}`),
-                  ...(c.tools.length === 0 ? [cardLine('c-none', C.faint, 'no tool calls yet')] : c.tools.slice(-3).map((t, k) => cardLine(`c-t${k}`, C.dim, `· ${t}`))),
-                  ...(c.answer ? [cardLine('c-ans', C.dim, `» ${c.answer}`)] : []),
-                ]),
               ),
               ...(v.expandedAgent === i && expanded
                 ? [
@@ -1263,12 +1253,6 @@ export const register: Register = on => {
                   {`${a.status === 'done' ? '•' : '×'} ${fmtElapsed((a.endedAt ?? now) - a.spawnedAt)}`}
                 </Text>
               )),
-              undefined,
-              hoverCard(C.agents, [
-                cardLine('c-name', C.text, a.name),
-                cardLine('c-where', C.dim, `${a.project}${a.account ? ` @${a.account}` : ''}${a.model ? ` · ${prettyModel(a.model)}` : ''}`),
-                cardLine('c-tok', C.faint, `${kTokens(a.ctx)} context · ${kTokens(a.out)} output`),
-              ]),
             ),
           )
         : []),
@@ -1316,17 +1300,6 @@ export const register: Register = on => {
         ))}
       </Text>,
       <Text color={C.faint}>{callsLabel}</Text>,
-      undefined,
-      hoverCard(C.ember, [
-        <Text key="c-key" wrap="truncate">
-          <Text color={C.jade}>■ edit </Text>
-          <Text color={C.ember}>■ run </Text>
-          <Text color={C.agents}>■ agent </Text>
-          <Text color={C.dim}>■ read </Text>
-          <Text color={C.log}>■ other </Text>
-          <Text color={C.alarm}>■ failed</Text>
-        </Text>,
-      ]),
     )
     const turnBlock = frame('turn', C.ember, isTurnLive, [
       row(
