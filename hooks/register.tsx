@@ -979,7 +979,6 @@ export const register: Register = on => {
                     'q-add',
                     <Button key="q-add" plain hotkey="q" onPress={addNew}>
                       <Text color={C.dim}>+ add</Text>
-                      {q.items.length === 0 ? <Text color={C.faint}> · or /q &lt;task&gt;; sent when Claude is idle</Text> : null}
                     </Button>,
                     null,
                   ),
@@ -1143,9 +1142,9 @@ export const register: Register = on => {
         : []),
       ...(isOpen('sessions') && !picking
         ? sessions.map((s, i) => {
-            // Off the terminal a Client beside the Button took the pointer over the name's first letters,
-            // so there the mark is plain Text inside the Button and the whole row is one target.
-            const isAnimated = hasClient && e.surface === 'terminal'
+            // A Client beside the Button took the pointer over the name's first letters, so a row that can
+            // be messaged draws its mark as plain Text inside the Button: the whole row is one target.
+            const isAnimated = hasClient && !canMessage(s)
             const mark =
               s.status === 'waiting' ? (
                 isAnimated ? (
