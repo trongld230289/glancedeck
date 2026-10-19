@@ -1286,7 +1286,7 @@ export const register: Register = on => {
         <Text color={t.agents > 0 ? C.agents : C.dim}>{plural(t.agents, 'agent')}</Text>
       </Text>
     )
-    // A meter like glanceline's 5h bar: one ▰ per tool call, colored by the kind of work, on a track of faint ▱;
+    // One ■ per tool call, colored by the kind of work, growing as calls come (no pre-drawn track);
     // past the width it shows the latest. The pointer on it shows the key.
     const CALL_COLOR: Record<string, string> = { e: C.jade, r: C.ember, a: C.agents, s: C.dim, o: C.log, x: C.alarm }
     const calls = t.calls ?? ''
@@ -1304,21 +1304,20 @@ export const register: Register = on => {
       <Text wrap="truncate">
         {runs.map((r, k) => (
           <Text key={`t-run-${k}`} color={CALL_COLOR[r.kind] ?? C.faint}>
-            {'▰'.repeat(r.n)}
+            {'■'.repeat(r.n)}
           </Text>
         ))}
-        <Text color={C.faint}>{'▱'.repeat(track - cells.length)}</Text>
       </Text>,
       <Text color={C.faint}>{callsLabel}</Text>,
       undefined,
       hoverCard(C.ember, [
         <Text key="c-key" wrap="truncate">
-          <Text color={C.jade}>▰ edit </Text>
-          <Text color={C.ember}>▰ run </Text>
-          <Text color={C.agents}>▰ agent </Text>
-          <Text color={C.dim}>▰ read </Text>
-          <Text color={C.log}>▰ other </Text>
-          <Text color={C.alarm}>▰ failed</Text>
+          <Text color={C.jade}>■ edit </Text>
+          <Text color={C.ember}>■ run </Text>
+          <Text color={C.agents}>■ agent </Text>
+          <Text color={C.dim}>■ read </Text>
+          <Text color={C.log}>■ other </Text>
+          <Text color={C.alarm}>■ failed</Text>
         </Text>,
       ]),
     )
