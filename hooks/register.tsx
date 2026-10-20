@@ -165,7 +165,8 @@ async function agentLabel($: EngineInterface, id: string): Promise<string> {
 }
 
 async function openPane($: EngineInterface) {
-  return $.ui.open({ id: PANE, title: 'GLANCEDECK', columns: PANE_COLUMNS, rows: 12 })
+  // PROBE (0.2.49): closeOnEscape makes Escape raise ui.close; the hook below only logs and refuses.
+  return $.ui.open({ id: PANE, title: 'GLANCEDECK', columns: PANE_COLUMNS, rows: 12, closeOnEscape: true })
 }
 
 async function openFile($: EngineInterface, path: string) {
@@ -765,6 +766,21 @@ export const register: Register = on => {
       await setRuntime($, r => ({ ...r, shells }))
     })
     return done
+  })
+
+  // PROBE (0.2.49): every close the person asks for (Escape, the × mark, ctrl+x x) is logged into the
+  // SESSION LOG with what the hook can see, then refused, so the pane stays and the log can be read.
+  // Nothing else changes; a plugin's own close and an unload pass as before.
+  on('ui.close', { id: PANE }, async ($, e, next) => {
+    if (e.origin.kind !== 'person') return next(e)
+    const [panes, v] = await Promise.all([$.ui.panes(), read($, view)])
+    const me = panes.find(p => p.id === PANE)
+    await say($, {
+      who: 'queue',
+      label: 'esc?',
+      text: `close by person · pane ${me?.isFocused ? 'has keys' : 'no keys'} · message line ${v?.messageTo ? 'open' : 'closed'}`,
+    })
+    return undefined
   })
 
   // Remember which block, and which queue item, holds the focus ring.
