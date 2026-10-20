@@ -43,7 +43,7 @@ Focus the pane with `ctrl+x tab`; Tab and the arrows walk the rows, Enter presse
 
 With the mouse: click a block's title to fold or unfold it; click **+ add** in QUEUE to add an item; click another session's row to message it (click again to close).
 
-If clicks and hovers land a few cells to the right of what you see (the dock grip lights up over QUEUE, session rows are hard to hit near their name), the terminal is drawing glyphs off its own cell grid, not the pane. In VS Code set  to  (it was  = DOM renderer, which drifts at 200% DPI) and open a new terminal.
+If clicks and hovers land a few cells to the right of what you see (the dock grip lights up over QUEUE, session rows are hard to hit near their name), the terminal is drawing glyphs off its own cell grid, not the pane. In VS Code set `terminal.integrated.gpuAcceleration` to `"on"` (it was `"off"` = DOM renderer, which drifts at 200% DPI) and open a new terminal.
 
 | Key | Does |
 |---|---|
