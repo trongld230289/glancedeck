@@ -819,7 +819,9 @@ export const register: Register = on => {
     const els = $.ui.resolve(e)
     const { Box, Text, Button } = els
     const Input = 'Input' in els ? els.Input : null
-    const hasClient = 'Client' in els
+    // Only the terminal runs a Client: Claude Desktop lists the element but its shell does not start, and the
+    // engine then paints an error line where each one stood, over the rows (seen 2026-10-21).
+    const hasClient = e.surface === 'terminal' && 'Client' in els
     const C = await paletteOf($, e.surface)
     const [v0, cards0, lines0, q0, rt0, beats0, selfBeat, turn0, selfId, cwd, now] = await Promise.all([
       read($, view),

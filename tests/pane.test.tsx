@@ -142,10 +142,13 @@ test('the TURN block runs while the main turn does, then becomes a receipt', asy
 test('the pane colors follow the host theme off a dark terminal', async ($, on) => {
   mock.clock(on, { now: Date.UTC(2026, 9, 18, 10, 0, 0) })
   on('session.cwd', () => ({ value: 'D:/Project/glanceline' }))
-  for (const [surface, text] of [['terminal', '#E6E8EE'], ['desktop', 'text']] as const) {
-    const ui = await $.ui.mount({ plugin: 'glancedeck', surface, ...PANE })
-    const mark = await ui.find({ key: 'wordmark' })
-    expect((mark?.props as { props?: { text?: string } })?.props?.text).toBe(text)
-    await ui.unmount()
-  }
+  // The terminal runs the wordmark Client; the desktop (no Client shell) gets the plain Text in the theme's color.
+  const terminal = await $.ui.mount({ plugin: 'glancedeck', surface: 'terminal', ...PANE })
+  const mark = await terminal.find({ key: 'wordmark' })
+  expect((mark?.props as { props?: { text?: string } })?.props?.text).toBe('#E6E8EE')
+  await terminal.unmount()
+  const desktop = await $.ui.mount({ plugin: 'glancedeck', surface: 'desktop', ...PANE })
+  expect(await desktop.find({ key: 'wordmark' })).toBeUndefined()
+  expect((await desktop.find({ type: 'Text', text: /^glance$/ }))?.props.color).toBe('text')
+  await desktop.unmount()
 })
