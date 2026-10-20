@@ -79,19 +79,6 @@ test('other sessions show up across accounts; one waiting 3 minutes alerts once;
       updatedAt: now,
       log: [],
     })
-    put(`${SESSIONS}/long.json`, {
-      sessionId: 'long',
-      project: 'acme-reporting-service-with-a-very-long-folder-name',
-      cwd: 'D:/acme-reporting-service-with-a-very-long-folder-name',
-      queueKey: 'acme-reporting-ghi',
-      account: null,
-      status: 'done',
-      activity: 'idle',
-      since: START - 60_000,
-      startedAt: START - 900_000,
-      updatedAt: now,
-      log: [],
-    })
   }
   others(START)
 
@@ -103,8 +90,6 @@ test('other sessions show up across accounts; one waiting 3 minutes alerts once;
   expect(await pane.find({ key: 's-spin-1' })).toBeDefined()
   expect(await pane.find({ text: '@acc2' })).toBeDefined()
   expect(await pane.find({ text: /Bash → npm run build/ })).toBeDefined()
-  // A name too long for the row is shortened but keeps the space after its mark: it lines up with the others.
-  expect(await pane.find({ text: /^ acme-reporting-service.*…$/ })).toBeDefined()
   expect(await pane.find({ text: /1 waiting/, in: 'h-waiting' })).toBeDefined()
   await pane.press({ key: 'l-tab-all' })
   expect(await pane.find({ text: /acme-api asks/ })).toBeDefined()
@@ -113,17 +98,6 @@ test('other sessions show up across accounts; one waiting 3 minutes alerts once;
   expect(await pane.find({ text: /→ acme-web: / })).toBeDefined()
   await pane.press({ key: 's-row-1' })
   expect(await pane.find({ text: /→ acme-web: / })).toBeUndefined()
-  await pane.press({ key: 's-row-0' })
-  expect(await pane.find({ text: /→ acme-api @acc2: / })).toBeDefined()
-  await pane.unmount()
-  // Escape hands the keyboard back to the prompt, which no element hears: the pane drawn without the keys
-  // shows no message line, and the next click on that row opens it again instead of toggling it shut.
-  pane = await $.ui.mount({ plugin: 'glancedeck', surface: 'terminal', ...PANE, props: { ...PANE.props, isFocused: false } })
-  expect(await pane.find({ text: /→ acme-api @acc2: / })).toBeUndefined()
-  await clock.advance(1)
-  await pane.unmount()
-  pane = await $.ui.mount({ plugin: 'glancedeck', surface: 'terminal', ...PANE })
-  expect(await pane.find({ text: /→ acme-api @acc2: / })).toBeUndefined()
   await pane.press({ key: 's-row-0' })
   expect(await pane.find({ text: /→ acme-api @acc2: / })).toBeDefined()
   await pane.unmount()

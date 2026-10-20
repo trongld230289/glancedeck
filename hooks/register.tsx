@@ -1068,20 +1068,13 @@ export const register: Register = on => {
         await focusInput($, 's-msg-input')
       }
     }
-    // Escape never reaches a pane element: it hands the keyboard back to the prompt. So the message line is
-    // open only while the pane holds the keys; Escape (or a click elsewhere) closes it, and a later click on
-    // the same row opens it again rather than toggling it shut.
-    const messageOpen = e.props.isFocused ? v.messageTo : null
-    // A drawing may not write state, so the stale target is dropped right after this draw: the line does not
-    // come back when the pane next takes the keys.
-    if (v.messageTo && !e.props.isFocused) $.clock.after(0, () => void setView($, x => (x.messageTo ? { ...x, messageTo: null } : x)))
     // A click on another session's row opens the message line to it; a second click closes it.
     const messageSession = async (s: (typeof sessions)[number]) => {
-      if (messageOpen === s.sessionId) return setView($, x => ({ ...x, messageTo: null }))
+      if (v.messageTo === s.sessionId) return setView($, x => ({ ...x, messageTo: null }))
       await setView($, x => ({ ...x, picking: null, messageTo: s.sessionId }))
       await focusInput($, 's-msg-input')
     }
-    const messageTarget = messageOpen ? sessions.find(s => s.sessionId === messageOpen) : undefined
+    const messageTarget = v.messageTo ? sessions.find(s => s.sessionId === v.messageTo) : undefined
     const waiting = sessions.filter(s => s.status === 'waiting').length
     const MARK: Record<SessionRow['status'], { icon: string; color: string }> = {
       waiting: { icon: '!', color: C.sessions },
@@ -1206,10 +1199,7 @@ export const register: Register = on => {
               // a click anywhere right of the mark opens the message line, not only on the words.
               const room = Math.max(0, inner - markWidth)
               const act = shorten(activity, Math.max(1, room - 1))
-              // shorten() trims, so a name cut short keeps its leading space here: it stays lined up with the rest.
-              const lead = name.slice(0, name.length - name.trimStart().length)
-              const nm =
-                name.length > room - act.length - 1 ? lead + shorten(name, Math.max(1, room - act.length - 1 - lead.length)) : name
+              const nm = name.length > room - act.length - 1 ? shorten(name, Math.max(1, room - act.length - 1)) : name
               const gap = ' '.repeat(Math.max(1, room - nm.length - act.length))
               const project = s.status === 'waiting' ? '' : nm.slice(0, s.project.length + 1)
               // A mark that is plain text goes inside the Button, so the row has no sibling to catch the
@@ -1523,7 +1513,7 @@ export const register: Register = on => {
 
     return (
       <Box flexDirection="column" width={W + 2} paddingX={1}>
-        <Box width={W}>
+        <Box width={W} marginBottom={1}>
           <Box flexGrow={1} flexShrink={1}>
             {hasClient ? (
               <els.Client key="wordmark" module="./wordmark.tsx" props={{ isBusy: isTurnLive || running > 0, text: C.text, ramp: C.ramp }} />
