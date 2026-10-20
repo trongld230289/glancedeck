@@ -1199,7 +1199,10 @@ export const register: Register = on => {
               // a click anywhere right of the mark opens the message line, not only on the words.
               const room = Math.max(0, inner - markWidth)
               const act = shorten(activity, Math.max(1, room - 1))
-              const nm = name.length > room - act.length - 1 ? shorten(name, Math.max(1, room - act.length - 1)) : name
+              // shorten() trims, so a name cut short keeps its leading space here: it stays lined up with the rest.
+              const lead = name.slice(0, name.length - name.trimStart().length)
+              const nm =
+                name.length > room - act.length - 1 ? lead + shorten(name, Math.max(1, room - act.length - 1 - lead.length)) : name
               const gap = ' '.repeat(Math.max(1, room - nm.length - act.length))
               const project = s.status === 'waiting' ? '' : nm.slice(0, s.project.length + 1)
               // A mark that is plain text goes inside the Button, so the row has no sibling to catch the
