@@ -116,6 +116,17 @@ test('other sessions show up across accounts; one waiting 3 minutes alerts once;
   await pane.press({ key: 's-row-0' })
   expect(await pane.find({ text: /→ acme-api @acc2: / })).toBeDefined()
   await pane.unmount()
+  // Escape hands the keyboard back to the prompt, which no element hears: the pane drawn without the keys
+  // shows no message line, and the next click on that row opens it again instead of toggling it shut.
+  pane = await $.ui.mount({ plugin: 'glancedeck', surface: 'terminal', ...PANE, props: { ...PANE.props, isFocused: false } })
+  expect(await pane.find({ text: /→ acme-api @acc2: / })).toBeUndefined()
+  await clock.advance(1)
+  await pane.unmount()
+  pane = await $.ui.mount({ plugin: 'glancedeck', surface: 'terminal', ...PANE })
+  expect(await pane.find({ text: /→ acme-api @acc2: / })).toBeUndefined()
+  await pane.press({ key: 's-row-0' })
+  expect(await pane.find({ text: /→ acme-api @acc2: / })).toBeDefined()
+  await pane.unmount()
 
   // This session's own heartbeat is in the shared folder for the others.
   expect(JSON.parse(files.get(`${SESSIONS}/self.json`)?.text ?? '{}')).toMatchObject({ sessionId: 'self', project: 'glanceline', account: null })
