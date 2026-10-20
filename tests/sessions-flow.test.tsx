@@ -104,7 +104,7 @@ test('other sessions show up across accounts; one waiting 3 minutes alerts once;
   expect(await pane.find({ text: '@acc2' })).toBeDefined()
   expect(await pane.find({ text: /Bash → npm run build/ })).toBeDefined()
   // A name too long for the row is shortened but keeps the space after its mark: it lines up with the others.
-  expect(await pane.find({ text: /^acme-reporting-service.*…$/ })).toBeDefined()
+  expect(await pane.find({ text: /^ acme-reporting-service.*…$/ })).toBeDefined()
   expect(await pane.find({ text: /1 waiting/, in: 'h-waiting' })).toBeDefined()
   await pane.press({ key: 'l-tab-all' })
   expect(await pane.find({ text: /acme-api asks/ })).toBeDefined()

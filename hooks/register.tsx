@@ -1153,8 +1153,9 @@ export const register: Register = on => {
                 s.status === 'working' && hasClient ? (
                   <Box>
                     <Box flexShrink={0}>
-                      <els.Client key="s-self-spin" module="./spin.tsx" props={{ color: C.ember, now }} />
                       <Text> </Text>
+                      <els.Client key="s-self-spin" module="./spin.tsx" props={{ color: C.ember, now }} />
+                      <Text>  </Text>
                     </Box>
                     <Text wrap="truncate" color={C.dim}>
                       {s.project}
@@ -1163,7 +1164,7 @@ export const register: Register = on => {
                   </Box>
                 ) : (
                   <Text wrap="truncate" color={C.dim}>
-                    {`${MARK[s.status].icon} ${s.project}`}
+                    {` ${MARK[s.status].icon}  ${s.project}`}
                     {s.account ? ` @${s.account}` : ''}
                   </Text>
                 ),
@@ -1189,14 +1190,15 @@ export const register: Register = on => {
                 )
               ) : s.status === 'working' && hasClient ? (
                 <Box key={`s-mark-${i}`} flexShrink={0}>
+                  <Text> </Text>
                   <els.Client key={`s-spin-${i}`} module="./spin.tsx" props={{ color: C.ember, now }} />
                   <Text> </Text>
                 </Box>
               ) : (
-                <Text key={`s-mark-${i}`} color={MARK[s.status].color}>{`${MARK[s.status].icon} `}</Text>
+                <Text key={`s-mark-${i}`} color={MARK[s.status].color}>{` ${MARK[s.status].icon} `}</Text>
               )
-            const markWidth = s.status === 'waiting' ? s.project.length + 4 : 2
-            const name = `${s.status === 'waiting' ? '' : s.project}${s.account ? ` @${s.account}` : ''}`
+            const markWidth = s.status === 'waiting' ? s.project.length + 4 : 3
+            const name = `${s.status === 'waiting' ? '' : ` ${s.project}`}${s.account ? ` @${s.account}` : ''}`
             const activity = s.elapsed ? `${s.activity} · ${s.elapsed}` : s.activity
             const actColor = s.status === 'waiting' ? C.sessions : C.dim
             if (canMessage(s)) {
@@ -1209,7 +1211,7 @@ export const register: Register = on => {
               const nm =
                 name.length > room - act.length - 1 ? lead + shorten(name, Math.max(1, room - act.length - 1 - lead.length)) : name
               const gap = ' '.repeat(Math.max(1, room - nm.length - act.length))
-              const project = s.status === 'waiting' ? '' : nm.slice(0, s.project.length)
+              const project = s.status === 'waiting' ? '' : nm.slice(0, s.project.length + 1)
               // A mark that is plain text goes inside the Button, so the row has no sibling to catch the
               // pointer: on the terminal a click on the name missed whenever the mark stood beside it.
               if (!(hasClient && (s.status === 'waiting' || s.status === 'working'))) {
@@ -1249,7 +1251,7 @@ export const register: Register = on => {
               <Box>
                 {mark}
                 <Text wrap="truncate">
-                  <Text color={C.text}>{s.status === 'waiting' ? '' : s.project}</Text>
+                  <Text color={C.text}>{s.status === 'waiting' ? '' : ` ${s.project}`}</Text>
                   {s.account ? <Text color={C.rose}>{` @${s.account}`}</Text> : null}
                 </Text>
               </Box>,
