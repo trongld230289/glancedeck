@@ -1521,8 +1521,7 @@ export const register: Register = on => {
 
     return (
       <Box flexDirection="column" width={W + 2} paddingX={1}>
-        {/* The wordmark and the counts sit on the blocks' content column, not over their border lines. */}
-        <Box width={W} paddingX={2}>
+        <Box width={W}>
           <Box flexGrow={1} flexShrink={1}>
             {hasClient ? (
               <els.Client key="wordmark" module="./wordmark.tsx" props={{ isBusy: isTurnLive || running > 0, text: C.text, ramp: C.ramp }} />
