@@ -16,7 +16,7 @@ const PANE = {
 const START = Date.UTC(2026, 9, 18, 3, 0, 0)
 const norm = (p: string) => p.replace(/\\/g, '/')
 
-test('other sessions show up across accounts; one waiting 3 minutes alerts once; an item moves to another session', async ($, on) => {
+test('other sessions show up across accounts; one waiting 3 minutes alerts once; an item moves to another session', { timeoutMs: 30000 }, async ($, on) => {
   const clock = mock.clock(on, { now: START })
   mock.env(on, { USERPROFILE: 'C:\\Users\\t', OS: 'Windows_NT', CLAUDE_CONFIG_DIR: 'C:\\Users\\t\\.claude' })
   const files = new Map<string, { text: string; at: number }>()
@@ -73,7 +73,7 @@ test('other sessions show up across accounts; one waiting 3 minutes alerts once;
       queueKey: 'acme-web-def',
       account: null,
       status: 'working',
-      activity: 'Bash → npm run build',
+      activity: 'Bash → npm run build -- --filter acme-web',
       since: START - 360_000,
       startedAt: START - 900_000,
       updatedAt: now,
@@ -115,6 +115,13 @@ test('other sessions show up across accounts; one waiting 3 minutes alerts once;
   expect(await pane.find({ text: /→ acme-web: / })).toBeUndefined()
   await pane.press({ key: 's-row-0' })
   expect(await pane.find({ text: /→ acme-api @acc2: / })).toBeDefined()
+  await pane.unmount()
+
+  // Dragged narrow, a session row still fits its width: one that ran over by a cell wrapped its last … onto a second line.
+  pane = await $.ui.mount({ plugin: 'glancedeck', surface: 'terminal', ...PANE, props: { ...PANE.props, bodyColumns: 50 } })
+  const rows = (await pane.findAll({ type: 'Button' })).filter(b => b.key?.startsWith('s-row-'))
+  expect(rows.length).toBeGreaterThan(0)
+  for (const b of rows) expect(b.text.length).toBeLessThanOrEqual(50 - 6)
   await pane.unmount()
 
   // This session's own heartbeat is in the shared folder for the others.

@@ -1196,9 +1196,12 @@ export const register: Register = on => {
               // A Button has no width of its own, so the gap between name and activity is spaces inside it:
               // a click anywhere right of the mark opens the message line, not only on the words.
               const room = Math.max(0, inner - markWidth)
-              const act = shorten(activity, Math.max(1, room - 1))
               // shorten() trims, so a name cut short keeps its leading space here: it stays lined up with the rest.
               const lead = name.slice(0, name.length - name.trimStart().length)
+              // The activity leaves the name at least its lead and one cell, plus the gap: without that the
+              // name's … and the gap pushed the row one cell over, and its last cell wrapped onto a second line.
+              const nameMin = name.length === 0 ? 0 : lead.length + 1
+              const act = shorten(activity, Math.max(1, room - nameMin - 1))
               const nm =
                 name.length > room - act.length - 1 ? lead + shorten(name, Math.max(1, room - act.length - 1 - lead.length)) : name
               const gap = ' '.repeat(Math.max(1, room - nm.length - act.length))
