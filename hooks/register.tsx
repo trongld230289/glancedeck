@@ -666,10 +666,18 @@ export const register: Register = on => {
         answer: '',
         model: started.model,
       }
-      await setAgents($, list => [...list, card].slice(-AGENTS_MAX))
-      if (!e.parentAgentId) await setTurn($, t => (t.endedAt === null && t.startedAt !== null ? { ...t, agents: t.agents + 1 } : t))
-      if (e.background && !e.parentAgentId) await setRuntime($, r => ({ ...r, background: [...r.background, agentId] }))
-      await say($, { who: 'agent', label: await agentLabel($, card.id), text: `started · ${card.name}` })
+      // An agent resumed under its id (SendMessage to one that finished) spawns again with that id: its one card runs
+      // again. A second card drew a second spin Client under the same key, the terminal refused the whole tree, and
+      // the pane went blank (2026-10-29).
+      const isNew = !((await read($, agents)) ?? []).some(c => c.id === agentId)
+      await setAgents($, list =>
+        isNew
+          ? [...list, card].slice(-AGENTS_MAX)
+          : list.map(c => (c.id === agentId ? { ...c, status: 'running', endedAt: null, model: started.model ?? c.model } : c)),
+      )
+      if (isNew && !e.parentAgentId) await setTurn($, t => (t.endedAt === null && t.startedAt !== null ? { ...t, agents: t.agents + 1 } : t))
+      if (e.background && !e.parentAgentId) await setRuntime($, r => ({ ...r, background: [...r.background.filter(id => id !== agentId), agentId] }))
+      await say($, { who: 'agent', label: await agentLabel($, card.id), text: `${isNew ? 'started' : 'resumed'} · ${card.name}` })
     })
 
     return started
@@ -1285,13 +1293,13 @@ export const register: Register = on => {
     const expanded = v.expandedAgent !== null ? cards[v.expandedAgent] : undefined
     // A light sweeps the names of the first few running agents; more would cost the drawing thread for little.
     const glowing = new Set(shown.filter(c => c.status === 'running').slice(0, 4).map(c => c.id))
-    const clock = (c: AgentCard) =>
+    const clock = (c: AgentCard, j: number) =>
       c.status !== 'running' ? (
         <Text
           color={c.status === 'done' ? C.jade : C.alarm}
         >{`${c.status === 'done' ? '•' : '×'} ${fmtElapsed((c.endedAt ?? now) - c.spawnedAt)}`}</Text>
       ) : hasClient && live('./spin.tsx') ? (
-        <els.Client key={`a-clock-${c.id}`} module="./spin.tsx" props={{ since: c.spawnedAt, now, color: C.ember }} />
+        <els.Client key={`a-clock-${j}-${c.id}`} module="./spin.tsx" props={{ since: c.spawnedAt, now, color: C.ember }} />
       ) : (
         <Text color={C.ember}>{`● ${fmtElapsed(now - c.spawnedAt)}`}</Text>
       )
@@ -1330,14 +1338,14 @@ export const register: Register = on => {
                     <Text color={v.expandedAgent === i ? C.agents : C.faint}>{`${j + 1} `}</Text>
                   </Button>
                   {hasClient && live('./spin.tsx') && glowing.has(c.id) ? (
-                    <els.Client key={`a-glow-${c.id}`} module="./spin.tsx" props={{ color: C.text, lit: C.agentsLit, label: c.name, noFrame: true, now }} />
+                    <els.Client key={`a-glow-${j}-${c.id}`} module="./spin.tsx" props={{ color: C.text, lit: C.agentsLit, label: c.name, noFrame: true, now }} />
                   ) : (
                     <Text wrap="truncate" color={c.status === 'running' ? C.text : C.dim}>
                       {c.name}
                     </Text>
                   )}
                 </Box>,
-                withModel(c.model, clock(c)),
+                withModel(c.model, clock(c, j)),
               ),
               ...(v.expandedAgent === i && expanded
                 ? [

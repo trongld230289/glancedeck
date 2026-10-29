@@ -152,3 +152,21 @@ test('the pane colors follow the host theme off a dark terminal', async ($, on) 
   expect((await desktop.find({ type: 'Text', text: /^glance$/ }))?.props.color).toBe('text')
   await desktop.unmount()
 })
+
+test('an agent resumed under its id keeps one card, so the pane still draws (two Clients under one key refused it)', async ($, on) => {
+  mock.clock(on, { now: Date.UTC(2026, 9, 18, 10, 0, 0) })
+  on('session.cwd', () => ({ value: 'D:/Project/glanceline' }))
+  on('turn.start', () => ({ turnId: 't1' }))
+  on('agent.spawn', () => ({ agentId: 'ac8e', model: 'claude-haiku-5-5' }))
+  await $.turn.start({ text: 'go', turnId: 't1' } as never)
+  await $.agent.spawn({ prompt: 'p', description: 'Build core', subagentType: 'general-purpose' } as never)
+  // SendMessage to the same agent: agent.spawn fires again with its id (2026-10-29: the second card drew a second
+  // spin Client under the same key, the terminal refused the tree, and the pane went blank).
+  await $.agent.spawn({ prompt: 'more', description: 'Build core', subagentType: 'general-purpose', resume: { agentId: 'ac8e' } } as never)
+
+  const ui = await $.ui.mount({ plugin: 'glancedeck', surface: 'terminal', ...PANE })
+  expect(await ui.find({ text: /1 running · 1 total/ })).toBeDefined()
+  expect(await ui.find({ key: 'a-0' })).toBeDefined()
+  expect(await ui.find({ key: 'a-1' })).toBeUndefined()
+  await ui.unmount()
+})
