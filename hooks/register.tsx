@@ -1577,14 +1577,25 @@ export const register: Register = on => {
         </Box>
       </Box>
     )
-  }).catch(($, e, next) => {
-    // The hook threw, overran or returned a tree the surface refused: one line instead of a blank pane.
+  }).catch(async ($, e, next) => {
+    // The hook threw, overran or returned a tree the surface refused: the reason instead of a blank pane, whole
+    // (a narrow pane cut it to "returned a tree …" on 2026-10-29), and on disk too, since an ordinary session
+    // keeps no debug log.
     const { Box, Text } = $.ui.resolve(e)
     const why = next.error.message ?? next.error.kind
     $.ui.log(`glancedeck: pane render failed (${next.error.kind}): ${why}`, { to: 'debug' })
+    await quietly($, 'render error file', async () => {
+      const [dir, now] = await Promise.all([sharedDir($), $.clock.now()])
+      if (dir) await $.fs.write(`${dir}/last-render-error.txt`, `${new Date(now).toISOString()} ${next.error.kind}: ${why}
+`)
+    })
     return (
-      <Box paddingX={1}>
-        <Text color="#FF7A7A" wrap="truncate">{`glancedeck: pane failed: ${why}`}</Text>
+      <Box flexDirection="column" paddingX={1}>
+        <Text color="#FF7A7A" bold>
+          glancedeck: the pane could not be drawn
+        </Text>
+        <Text color="#FF7A7A">{why}</Text>
+        <Text color="#8B93A7">(also in ~/.glancedeck/last-render-error.txt)</Text>
       </Box>
     )
   })
