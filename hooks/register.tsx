@@ -45,6 +45,10 @@ import { accountOf, dueAlerts, isLive, isQueueOwner, mergeLogs, parseHeartbeat, 
 const PANE = 'glancedeck'
 const PANE_COLUMNS = 58
 const COUNTDOWN_MS = 5000
+// Surface modules (./spin.tsx, ...) a surface reported failed since the last reload: the pane draws plain text in
+// their place. Without this the engine redrew the pane with the same Client, it failed again, and the pane stayed
+// blank until something else invalidated it (seen 2026-10-29).
+const faulted = new Set<string>()
 // A waiting session's chip beats this long, then holds still so it never nags.
 const PULSE_MS = 30_000
 
@@ -779,6 +783,19 @@ export const register: Register = on => {
     return next(e)
   })
 
+  // A Client of the pane failed on the surface (its timer, a throw while drawing, a flood): say so in the log, leave
+  // that module out and ask for a redraw. The engine's own redraw after a fault draws nothing if the Client fails again.
+  on('ui.fault', { component: 'Pane', requestId: PANE }, async ($, e, next) => {
+    // By file name: the prop says `./spin.tsx`, the fault names the module's path under the plugin's folder.
+    faulted.add(basename(e.module))
+    $.ui.log(`glancedeck: ${e.module} (${e.element}) failed while ${e.phase}: ${e.reason}`, { to: 'debug' })
+    await quietly($, 'fault log', () =>
+      say($, { who: 'main', label: 'pane', text: `${basename(e.module)} failed (${e.phase}): ${shorten(e.reason, 60)}`, isError: true }),
+    )
+    $.ui.invalidate('ui.render')
+    return next(e)
+  })
+
   // ---------------------------------------------------------------- the band above the prompt: a send about to happen
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
@@ -822,6 +839,7 @@ export const register: Register = on => {
     // Only the terminal runs a Client: Claude Desktop lists the element but its shell does not start, and the
     // engine then paints an error line where each one stood, over the rows (seen 2026-10-21).
     const hasClient = e.surface === 'terminal' && 'Client' in els
+    const live = (module: string) => !faulted.has(basename(module))
     const C = await paletteOf($, e.surface)
     const [v0, cards0, lines0, q0, rt0, beats0, selfBeat, turn0, selfId, cwd, now] = await Promise.all([
       read($, view),
@@ -938,7 +956,7 @@ export const register: Register = on => {
           changeQueue($, x => ({ ...x, items: x.items.map(it => (it.id === item.id ? { ...it, text, isBlocked: undefined } : it)) })),
         )
       }
-      if (i === 0 && counting && hasClient) {
+      if (i === 0 && counting && hasClient && live('./ticket.tsx')) {
         return (
           <Box key={`q-item-${item.id}`} width={inner}>
             <els.Client
@@ -1145,7 +1163,7 @@ export const register: Register = on => {
             ((s: SessionRow) =>
               row(
                 's-self',
-                s.status === 'working' && hasClient ? (
+                s.status === 'working' && hasClient && live('./spin.tsx') ? (
                   <Box>
                     <Box flexShrink={0}>
                       <els.Client key="s-self-spin" module="./spin.tsx" props={{ color: C.ember, now }} />
@@ -1171,7 +1189,7 @@ export const register: Register = on => {
         ? sessions.map((s, i) => {
             const mark =
               s.status === 'waiting' ? (
-                hasClient ? (
+                hasClient && live('./pulse.tsx') ? (
                   <Box key={`s-mark-${i}`} flexShrink={0}>
                     <els.Client
                       key={`s-pulse-${i}`}
@@ -1182,7 +1200,7 @@ export const register: Register = on => {
                 ) : (
                   <Text key={`s-mark-${i}`} backgroundColor={C.sessions} color={C.ink} bold>{` ! ${s.project} `}</Text>
                 )
-              ) : s.status === 'working' && hasClient ? (
+              ) : s.status === 'working' && hasClient && live('./spin.tsx') ? (
                 <Box key={`s-mark-${i}`} flexShrink={0}>
                   <els.Client key={`s-spin-${i}`} module="./spin.tsx" props={{ color: C.ember, now }} />
                   <Text> </Text>
@@ -1210,7 +1228,7 @@ export const register: Register = on => {
               const project = s.status === 'waiting' ? '' : nm.slice(0, s.project.length)
               // A mark that is plain text goes inside the Button, so the row has no sibling to catch the
               // pointer: on the terminal a click on the name missed whenever the mark stood beside it.
-              if (!(hasClient && (s.status === 'waiting' || s.status === 'working'))) {
+              if (!((s.status === 'waiting' && hasClient && live('./pulse.tsx')) || (s.status === 'working' && hasClient && live('./spin.tsx')))) {
                 return (
                   <Box key={`s-${i}`} width={inner} hover={{ backgroundColor: C.rowHover }}>
                     <Button key={`s-row-${i}`} plain onPress={() => messageSession(s)}>
@@ -1272,7 +1290,7 @@ export const register: Register = on => {
         <Text
           color={c.status === 'done' ? C.jade : C.alarm}
         >{`${c.status === 'done' ? '•' : '×'} ${fmtElapsed((c.endedAt ?? now) - c.spawnedAt)}`}</Text>
-      ) : hasClient ? (
+      ) : hasClient && live('./spin.tsx') ? (
         <els.Client key={`a-clock-${c.id}`} module="./spin.tsx" props={{ since: c.spawnedAt, now, color: C.ember }} />
       ) : (
         <Text color={C.ember}>{`● ${fmtElapsed(now - c.spawnedAt)}`}</Text>
@@ -1311,7 +1329,7 @@ export const register: Register = on => {
                   >
                     <Text color={v.expandedAgent === i ? C.agents : C.faint}>{`${j + 1} `}</Text>
                   </Button>
-                  {hasClient && glowing.has(c.id) ? (
+                  {hasClient && live('./spin.tsx') && glowing.has(c.id) ? (
                     <els.Client key={`a-glow-${c.id}`} module="./spin.tsx" props={{ color: C.text, lit: C.agentsLit, label: c.name, noFrame: true, now }} />
                   ) : (
                     <Text wrap="truncate" color={c.status === 'running' ? C.text : C.dim}>
@@ -1348,7 +1366,7 @@ export const register: Register = on => {
                 {a.account ? <Text color={C.rose}>{` @${a.account}`}</Text> : null}
               </Text>,
               withModel(a.model, a.status === 'running' ? (
-                hasClient ? (
+                hasClient && live('./spin.tsx') ? (
                   <els.Client key={`a-peer-clock-${k}`} module="./spin.tsx" props={{ since: a.spawnedAt, now, color: C.ember }} />
                 ) : (
                   <Text color={C.ember}>{`● ${fmtElapsed(now - a.spawnedAt)}`}</Text>
@@ -1422,14 +1440,14 @@ export const register: Register = on => {
       ) : isTurnLive ? (
         row(
           't-now',
-          hasClient ? (
+          hasClient && live('./spin.tsx') ? (
             <els.Client key="t-spin-label" module="./spin.tsx" props={{ color: C.ember, lit: C.emberLit, label: doing, bold: true, now }} />
           ) : (
             <Text color={C.ember} bold>
               {`● ${doing}`}
             </Text>
           ),
-          hasClient ? (
+          hasClient && live('./spin.tsx') ? (
             <els.Client
               key="t-spin"
               module="./spin.tsx"
@@ -1521,7 +1539,7 @@ export const register: Register = on => {
       <Box flexDirection="column" width={W + 2} paddingX={1}>
         <Box width={W}>
           <Box flexGrow={1} flexShrink={1}>
-            {hasClient ? (
+            {hasClient && live('./wordmark.tsx') ? (
               <els.Client key="wordmark" module="./wordmark.tsx" props={{ isBusy: isTurnLive || running > 0, text: C.text, ramp: C.ramp }} />
             ) : (
               <Text wrap="truncate">
@@ -1533,7 +1551,7 @@ export const register: Register = on => {
             )}
           </Box>
           <Box flexShrink={0}>
-            {waiting > 0 && hasClient ? (
+            {waiting > 0 && hasClient && live('./pulse.tsx') ? (
               <Box>
                 <Text>{'  '}</Text>
                 <els.Client
@@ -1557,6 +1575,16 @@ export const register: Register = on => {
           {agentsBlock}
           {logBlock}
         </Box>
+      </Box>
+    )
+  }).catch(($, e, next) => {
+    // The hook threw, overran or returned a tree the surface refused: one line instead of a blank pane.
+    const { Box, Text } = $.ui.resolve(e)
+    const why = next.error.message ?? next.error.kind
+    $.ui.log(`glancedeck: pane render failed (${next.error.kind}): ${why}`, { to: 'debug' })
+    return (
+      <Box paddingX={1}>
+        <Text color="#FF7A7A" wrap="truncate">{`glancedeck: pane failed: ${why}`}</Text>
       </Box>
     )
   })
